@@ -1,0 +1,401 @@
+{% extends "layout.html" %}
+
+{% block title %}API Documentation | GameStore Catalog{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/bash.min.js"></script>
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<style>
+  .api-endpoint {
+    border-left: 4px solid #0ea5e9; /* primary-500 */
+  }
+  .code-block {
+    font-family: monospace;
+    white-space: pre;
+    overflow-x: auto;
+    background-color: #1e293b; /* gray-800 */
+    color: #e2e8f0; /* gray-200 */
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-size: 0.875rem;
+  }
+  .dark .code-block {
+    background-color: #0f172a; /* gray-900 */
+  }
+  .parameter {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e2e8f0; /* gray-200 */
+  }
+  .dark .parameter {
+    border-color: #334155; /* gray-700 */
+  }
+  .parameter:last-child {
+    border-bottom: none;
+  }
+  .parameter-name {
+    font-weight: 500;
+  }
+  .parameter-meta {
+    font-size: 0.875rem;
+    color: #64748b; /* gray-500 */
+  }
+  .dark .parameter-meta {
+    color: #94a3b8; /* gray-400 */
+  }
+  .parameter-desc {
+     font-size: 0.875rem;
+     color: #475569; /* gray-600 */
+  }
+  .dark .parameter-desc {
+    color: #94a3b8; /* gray-400 */
+  }
+  .required-param {
+    color: #ef4444; /* red-500 */
+  }
+  .dark .required-param {
+    color: #f87171; /* red-400 */
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <h1 class="text-3xl md:text-4xl font-bold mb-6">API Documentation</h1>
+  
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+    <h2 class="text-2xl font-semibold mb-4">Introduction</h2>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      The GameStore Catalog API allows you to programmatically access game information from multiple sources.
+      This documentation provides information about the available endpoints and how to use them.
+    </p>
+    
+    <div class="bg-sky-100 dark:bg-sky-900 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-200 p-4 rounded-lg mb-6">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <i class="fas fa-info-circle mt-0.5"></i>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium">Base URL</h3>
+          <div class="mt-2 text-sm">
+            <p>All API requests should be made to:</p>
+            <code class="bg-sky-200 dark:bg-sky-800 px-2 py-1 rounded mt-2 inline-block">{{ request.url_root }}api</code>
+            <p class="mt-1">Example: <code>{{ request.url_root }}api/sites</code></p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <h3 class="font-semibold text-lg mb-2">Available Sites</h3>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      The API supports multiple game sites. Most endpoints require a <code>site</code> query parameter to specify which source to use.
+      You can get the list of available site IDs from the <code>/api/sites</code> endpoint.
+    </p>
+    
+    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden mb-6">
+      {% for site_item in sites %}
+      <div class="parameter">
+        <div>
+          <span class="parameter-name">{{ site_item.id }}</span>
+        </div>
+        <div class="parameter-desc">{{ site_item.name }} - {{ site_item.description }}</div>
+      </div>
+      {% else %}
+      <div class="parameter">
+        <div class="parameter-desc">No sites discovered. Check server logs.</div>
+      </div>
+      {% endfor %}
+    </div>
+    
+    <h3 class="font-semibold text-lg mb-2">Authentication</h3>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      The API currently does not require authentication. All endpoints are publicly accessible.
+    </p>
+    
+    <h3 class="font-semibold text-lg mb-2">Rate Limiting</h3>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      To ensure the stability of the service, the API has rate limiting in place (e.g., per hour limits for different endpoints).
+      If you exceed the rate limit, you will receive a `429 Too Many Requests` error.
+    </p>
+    
+    <h3 class="font-semibold text-lg mb-2">Response Format</h3>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      All API responses are returned in JSON format. Each response includes a <code>status</code> field (`"success"` or `"error"`).
+      In case of an error, the response will include an error `message` and a `code`.
+    </p>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <p class="font-medium mb-1">Success Response Example:</p>
+            <div class="code-block">
+{
+  "status": "success",
+  "site": "gamepciso",
+  // ... endpoint specific data ...
+}</div>
+        </div>
+        <div>
+            <p class="font-medium mb-1">Error Response Example:</p>
+            <div class="code-block">
+{
+  "status": "error",
+  "message": "Site parameter is required.",
+  "code": "MISSING_PARAMETER_SITE"
+}</div>
+        </div>
+    </div>
+    
+    <h3 class="font-semibold text-lg mt-6 mb-2">Client Library</h3>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      A basic JavaScript client library is provided to simplify API interactions. Include it in your project:
+    </p>
+    
+    <div class="code-block mb-4">
+&lt!-- Include the API client --&gt
+&ltscript src="{{ url_for('static', filename='js/api.js') }}"&gt&lt/script&gt</div>
+    <p class="text-gray-700 dark:text-gray-300">See usage examples at the end of this document or in the `static/js/api.js` file.</p>
+  </div>
+  
+  <!-- API Endpoints Details -->
+
+  <!-- /api/sites -->
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 api-endpoint">
+    <div class="flex items-center mb-4">
+      <span class="px-2 py-1 text-xs font-bold text-white bg-green-600 rounded-md mr-3">GET</span>
+      <h2 class="text-xl font-semibold">/api/sites</h2>
+    </div>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      Returns a list of available game scraping sites supported by the API.
+    </p>
+    <h3 class="font-semibold text-lg mb-2">Example Request</h3>
+    <div class="code-block mb-4">GET {{ request.url_root }}api/sites</div>
+    <h3 class="font-semibold text-lg mb-2">Example Response</h3>
+    <div class="code-block">
+{
+  "status": "success",
+  "sites": [
+    {
+      "id": "gamepciso",
+      "name": "GamePCISO",
+      "description": "Game PC ISO download site"
+    },
+    {
+      "id": "ovagames",
+      "name": "OvaGames",
+      "description": "A popular site for PC games"
+    }
+    // ... more sites
+  ]
+}</div>
+  </div>
+
+  <!-- /api/games -->
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 api-endpoint">
+    <div class="flex items-center mb-4">
+      <span class="px-2 py-1 text-xs font-bold text-white bg-green-600 rounded-md mr-3">GET</span>
+      <h2 class="text-xl font-semibold">/api/games</h2>
+    </div>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      Returns a paginated list of games from a specified site. Can be filtered by category if the scraper supports it.
+    </p>
+    <h3 class="font-semibold text-lg mb-2">Query Parameters</h3>
+    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden mb-4">
+      <div class="parameter">
+        <div><span class="parameter-name">site</span> <span class="parameter-meta">(string, <span class="required-param">required</span>)</span></div>
+        <div class="parameter-desc">ID of the site to get games from (e.g., "ovagames", "gamepciso").</div>
+      </div>
+      <div class="parameter">
+        <div><span class="parameter-name">page</span> <span class="parameter-meta">(integer, optional, default: 1)</span></div>
+        <div class="parameter-desc">Page number for pagination.</div>
+      </div>
+      <div class="parameter">
+        <div><span class="parameter-name">category</span> <span class="parameter-meta">(string, optional)</span></div>
+        <div class="parameter-desc">Category slug to filter games (e.g., "action", "rpg"). Availability depends on the site/scraper.</div>
+      </div>
+    </div>
+    <h3 class="font-semibold text-lg mb-2">Example Request</h3>
+    <div class="code-block mb-4">GET {{ request.url_root }}api/games?site=ovagames&page=1&category=action</div>
+    <h3 class="font-semibold text-lg mb-2">Example Response</h3>
+    <div class="code-block">
+{
+  "status": "success",
+  "site": "ovagames",
+  "games": [
+    {
+      "title": "Example Game Title",
+      "url": "https://ovagames.com/example-game-title",
+      "image": "https://ovagames.com/images/example-game.jpg",
+      "release_date": "Jan 01, 2023", // Can be null
+      "site": "ovagames" // Redundant here, but part of _format_game_data
+    }
+    // ... more games
+  ],
+  "has_next": true,
+  "current_page": 1
+}</div>
+  </div>
+
+  <!-- /api/game -->
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 api-endpoint">
+    <div class="flex items-center mb-4">
+      <span class="px-2 py-1 text-xs font-bold text-white bg-green-600 rounded-md mr-3">GET</span>
+      <h2 class="text-xl font-semibold">/api/game</h2>
+    </div>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      Returns detailed information about a specific game using its URL on the source site.
+    </p>
+    <h3 class="font-semibold text-lg mb-2">Query Parameters</h3>
+    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden mb-4">
+      <div class="parameter">
+        <div><span class="parameter-name">site</span> <span class="parameter-meta">(string, <span class="required-param">required</span>)</span></div>
+        <div class="parameter-desc">ID of the site the game URL belongs to.</div>
+      </div>
+      <div class="parameter">
+        <div><span class="parameter-name">url</span> <span class="parameter-meta">(string, <span class="required-param">required</span>)</span></div>
+        <div class="parameter-desc">The full URL of the game page on the source site.</div>
+      </div>
+    </div>
+    <h3 class="font-semibold text-lg mb-2">Example Request</h3>
+    <div class="code-block mb-4">GET {{ request.url_root }}api/game?site=gamepciso&url=https://gamepciso.com/example-game-path/</div>
+    <h3 class="font-semibold text-lg mb-2">Example Response</h3>
+    <div class="code-block">
+{
+  "status": "success",
+  "site": "gamepciso",
+  "title": "Detailed Game Name",
+  "url": "https://gamepciso.com/example-game-path/", // Original URL passed
+  "image": "https://gamepciso.com/path/to/cover-image.jpg", // Main cover image
+  "genre": "Action, RPG", // Can be null or string
+  "release_date": "Dec 10, 2022", // Can be null
+  "developer": "Game Dev Studios", // Can be null
+  "publisher": "Game Publisher Inc.", // Can be null
+  "description": "This is a detailed description of the game...", // Can be null
+  "system_requirements": "MINIMUM:\nOS: Windows 10\n...", // Can be null
+  "screenshots": [
+    "https://gamepciso.com/path/to/screenshot1.jpg",
+    "https://gamepciso.com/path/to/screenshot2.jpg"
+  ], // Can be empty list
+  "download_links": [
+    {
+      "url": "https://download1.example.com", 
+      "text": "Download Part 1 (Host A)",
+      "group": "Main Game Files", // Optional, depends on scraper
+      "section": "Host A" // Optional, depends on scraper
+    },
+    // More download links, structure may vary slightly per scraper
+  ], // Can be empty list
+  "download_password": "somepassword123", // Can be null or empty
+  "related_games": [
+    {
+      "title": "Related Game X",
+      "url": "https://gamepciso.com/related-game-x/",
+      "image": "https://gamepciso.com/path/to/related-x.jpg",
+      "site": "gamepciso"
+    }
+  ] // Can be empty list
+}</div>
+  </div>
+
+  <!-- /api/search -->
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 api-endpoint">
+    <div class="flex items-center mb-4">
+      <span class="px-2 py-1 text-xs font-bold text-white bg-green-600 rounded-md mr-3">GET</span>
+      <h2 class="text-xl font-semibold">/api/search</h2>
+    </div>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      Searches for games on a specified site based on a query string.
+    </p>
+    <h3 class="font-semibold text-lg mb-2">Query Parameters</h3>
+    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden mb-4">
+      <div class="parameter">
+        <div><span class="parameter-name">site</span> <span class="parameter-meta">(string, <span class="required-param">required</span>)</span></div>
+        <div class="parameter-desc">ID of the site to search on.</div>
+      </div>
+      <div class="parameter">
+        <div><span class="parameter-name">q</span> <span class="parameter-meta">(string, <span class="required-param">required</span>)</span></div>
+        <div class="parameter-desc">The search query string.</div>
+      </div>
+    </div>
+    <h3 class="font-semibold text-lg mb-2">Example Request</h3>
+    <div class="code-block mb-4">GET {{ request.url_root }}api/search?site=ovagames&q=survival</div>
+    <h3 class="font-semibold text-lg mb-2">Example Response</h3>
+    <div class="code-block">
+{
+  "status": "success",
+  "site": "ovagames",
+  "query": "survival",
+  "results": [
+    {
+      "title": "Survival Game Example",
+      "url": "https://ovagames.com/survival-game-example",
+      "image": "https://ovagames.com/images/survival-game.jpg",
+      "release_date": "Feb 15, 2023", // Can be null
+      "site": "ovagames"
+    }
+    // ... more results
+  ]
+}</div>
+  </div>
+  
+  <!-- Client Usage -->
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+    <h2 class="text-2xl font-semibold mb-4">Client Library Usage Examples</h2>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      Using the provided `static/js/api.js` client:
+    </p>
+    
+    <div class="code-block mb-6">
+// Initialize the client (assuming api.js is included)
+const apiClient = new GameCatalogAPI();
+
+// --- Get available sites ---
+apiClient.getSites()
+  .then(data => {
+    console.log('Available sites:', data.sites);
+    if (data.sites && data.sites.length > 0) {
+      // Set default site for subsequent calls if needed
+      apiClient.setDefaultSite(data.sites[0].id); 
+    }
+  })
+  .catch(error => console.error('Error fetching sites:', error));
+
+// --- Get games list (using default site or specify) ---
+apiClient.getGames({ site: 'gamepciso', page: 1, category: 'Action' }) // Specify site
+  .then(data => console.log('Games from gamepciso (Action, Page 1):', data.games))
+  .catch(error => console.error('Error fetching games:', error));
+
+// apiClient.getGames({ page: 2 }) // Uses default site set earlier
+//   .then(data => console.log('Games (Page 2, default site):', data.games))
+//   .catch(error => console.error('Error fetching games:', error));
+
+// --- Get game details ---
+const gamePageUrl = 'https://gamepciso.com/example-game-123/'; // Replace with an actual game URL
+apiClient.getGameDetails(gamePageUrl, 'gamepciso')
+  .then(data => console.log(`Details for ${gamePageUrl}:`, data))
+  .catch(error => console.error('Error fetching game details:', error));
+
+// --- Search games ---
+apiClient.searchGames('strategy', 'ovagames')
+  .then(data => console.log('Search results for "strategy" on ovagames:', data.results))
+  .catch(error => console.error('Error searching games:', error));
+</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.code-block').forEach(block => {
+      hljs.highlightElement(block);
+    });
+  });
+</script>
+{% endblock %}

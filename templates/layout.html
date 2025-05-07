@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" class="{{ 'dark' if dark_mode == 'true' else '' }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Browse and download games from multiple game sites">
+  <title>{% block title %}GameStore Catalog{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com?plugins=typography,line-clamp"></script> {# Added plugins #}
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a', 950: '#172554' },
+            gray: { 50: '#f9fafb', 100: '#f3f4f6', 200: '#e5e7eb', 300: '#d1d5db', 400: '#9ca3af', 500: '#6b7280', 600: '#4b5563', 700: '#374151', 750: '#2a3341', 800: '#1f2937', 900: '#111827', 950: '#030712' }
+          },
+          animation: { 'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite', },
+          typography: (theme) => ({ /* Keep typography config */ }),
+          textShadow: { 'md': '0 2px 4px rgba(0, 0, 0, 0.2)', /* Example text shadow */ }
+        }
+      },
+       plugins: [
+         require('@tailwindcss/typography'),
+         require('@tailwindcss/line-clamp'),
+         function ({ addUtilities }) { // Simple text-shadow plugin
+            addUtilities({ '.text-shadow-md': { textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)' }, '.text-shadow-none': { textShadow: 'none' } })
+         }
+       ],
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; } /* gray-300 */
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; } /* gray-400 */
+    .dark ::-webkit-scrollbar-thumb { background: #4b5563; } /* gray-600 */
+    .dark ::-webkit-scrollbar-thumb:hover { background: #6b7280; } /* gray-500 */
+    /* Page loader removed for simplicity, was causing visual glitches */
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen transition-colors duration-300 bg-gray-100 text-gray-900 dark:bg-gray-950 dark:text-gray-100 antialiased">
+  <!-- Navigation -->
+  <nav class="bg-white shadow-md dark:bg-gray-900 sticky top-0 z-50">
+    <div class="container mx-auto px-4">
+      <div class="flex justify-between items-center h-16">
+        <a href="{{ url_for('web.home') }}" class="flex items-center space-x-2 text-xl font-bold text-primary-600 dark:text-primary-400 hover:opacity-80 transition-opacity">
+          <i class="fas fa-dice-d20"></i>
+          <span>GameStore Catalog</span>
+        </a>
+        <div class="flex items-center space-x-2 sm:space-x-4">
+          {# templates/layout.html (Desktop Search Form) #}
+          <form action="{{ url_for('web.search') }}" method="get" class="flex items-center">
+              {# Hidden input is no longer strictly needed for global search, but keeping doesn't hurt #}
+              <input type="hidden" name="site" value="{{ site or default_site_id }}">
+              <input type="search" name="q" placeholder="Search all sites..." value="{{ query or '' }}"
+                     class="px-3 py-1.5 w-36 sm:w-48 lg:w-64 text-sm rounded-l-md border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white transition-all duration-150" aria-label="Search games">
+              <button type="submit" class="bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-r-md h-[34px] flex items-center justify-center" aria-label="Submit search">
+                  <i class="fas fa-search"></i>
+              </button>
+          </form>
+          
+          {# templates/layout.html (Mobile Search Form) #}
+          <form action="{{ url_for('web.search') }}" method="get" class="flex items-center">
+               {# Hidden input is no longer strictly needed for global search #}
+              <input type="hidden" name="site" value="{{ site or default_site_id }}">
+              <input type="search" name="q" placeholder="Search all sites..." value="{{ query or '' }}"
+                     class="w-full px-4 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white transition-all duration-150">
+              <button type="submit" class="bg-primary-600 hover:bg-primary-700 text-white px-3 py-2 rounded-r-md h-[42px] flex items-center justify-center">
+                  <i class="fas fa-search"></i>
+              </button>
+          </form>
+          <button id="darkModeToggle" title="Toggle dark mode" class="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+            <i class="fas fa-moon dark:hidden"></i>
+            <i class="fas fa-sun hidden dark:block"></i>
+          </button>
+          <a href="{{ url_for('web.api_docs_page') }}" title="API Documentation" class="hidden sm:flex items-center space-x-1 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm">
+            <i class="fas fa-code"></i>
+            <span class="hidden lg:inline">API</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="container mx-auto px-4 py-8">
+    {# Display fetch errors if any #}
+    {% if fetch_errors %}
+      <div class="mb-6 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md shadow-sm" role="alert">
+        <p class="font-bold">Error Fetching Some Sites:</p>
+        <ul class="mt-2 list-disc list-inside text-sm">
+          {% for error in fetch_errors %}
+            <li>{{ error | safe }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-200 dark:bg-gray-900 py-6 mt-12 border-t border-gray-300 dark:border-gray-700">
+    <div class="container mx-auto px-4">
+      <div class="flex flex-col md:flex-row justify-between items-center text-sm">
+        <div class="text-center md:text-left mb-4 md:mb-0 text-gray-700 dark:text-gray-300">
+          <p>© {{ current_year }} GameStore Catalog. All game data is scraped from public sources.</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Version: {{ version }} (Build: {{ build_date }})</p>
+        </div>
+        <div class="flex space-x-4 text-gray-600 dark:text-gray-400">
+          <a href="{{ url_for('web.home') }}" class="hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+            <i class="fas fa-home"></i> Home
+          </a>
+          <a href="{{ url_for('web.api_docs_page') }}" class="hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+            <i class="fas fa-code"></i> API
+          </a>
+          <a href="https://github.com/your-username/your-repo" target="_blank" rel="noopener noreferrer" class="hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+            <i class="fab fa-github"></i> GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Dark mode toggle
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    const htmlElement = document.documentElement;
+    if (document.cookie.includes('dark_mode=true') || (!document.cookie.includes('dark_mode=') && window.matchMedia('(prefers-color-scheme: dark)').matches)) { htmlElement.classList.add('dark'); }
+    darkModeToggle.addEventListener('click', () => { htmlElement.classList.toggle('dark'); const isDarkMode = htmlElement.classList.contains('dark'); document.cookie = `dark_mode=${isDarkMode}; path=/; max-age=${60*60*24*365}; SameSite=Lax`; });
+    // Image fallback handler
+    document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('img[data-fallback]').forEach(function(img) { img.addEventListener('error', function() { if (this.src !== this.getAttribute('data-fallback')) { this.src = this.getAttribute('data-fallback'); } }); if (img.loading === 'lazy' && !img.src && img.dataset.src) { img.src = img.dataset.src; } else if (!img.src && img.dataset.src) { img.src = img.dataset.src; } }); });
+  </script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,244 @@
+{% extends "layout.html" %}
+
+{% block title %}API Documentation | OvaGames Catalog{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/bash.min.js"></script>
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<style>
+  .api-endpoint {
+    border-left: 4px solid #0ea5e9;
+  }
+  .code-block {
+    font-family: monospace;
+    white-space: pre;
+    overflow-x: auto;
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+  }
+  .dark .code-block {
+    background-color: #0f172a;
+  }
+  .parameter {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .dark .parameter {
+    border-color: #334155;
+  }
+  .parameter:last-child {
+    border-bottom: none;
+  }
+  .language-tabs {
+    display: flex;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 1rem;
+  }
+  .dark .language-tabs {
+    border-color: #334155;
+  }
+  .language-tab {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .language-tab.active {
+    border-bottom: 2px solid #0ea5e9;
+    font-weight: 600;
+  }
+  .code-example {
+    display: none;
+  }
+  .code-example.active {
+    display: block;
+  }
+  .try-it-btn {
+    background-color: #0ea5e9;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .try-it-btn:hover {
+    background-color: #0284c7;
+  }
+  .response-container {
+    display: none;
+    margin-top: 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+  .dark .response-container {
+    border-color: #334155;
+  }
+  .response-header {
+    background-color: #f8fafc;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .dark .response-header {
+    background-color: #1e293b;
+    border-color: #334155;
+  }
+  .response-body {
+    padding: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <h1 class="text-3xl md:text-4xl font-bold mb-6">API Documentation</h1>
+
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+    <h2 class="text-2xl font-semibold mb-4">Introduction</h2>
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      The OvaGames Catalog API allows you to programmatically access game information from the OvaGames website.
+      This documentation provides information about the available endpoints and how to use them.
+    </p>
+    <div class="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 p-4 rounded-lg">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <i class="fas fa-info-circle mt-0.5"></i>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium">Base URL</h3>
+          <div class="mt-2 text-sm">
+            <p>All API requests should be made to:</p>
+            <code class="bg-yellow-200 dark:bg-yellow-800 px-2 py-1 rounded mt-2 inline-block">{{ request.url_root }}</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Games List Endpoint -->
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 api-endpoint">
+    <div class="flex items-center mb-4">
+      <span class="px-2 py-1 text-xs font-bold text-white bg-green-600 rounded-md mr-3">GET</span>
+      <h2 class="text-xl font-semibold">/api/games</h2>
+    </div>
+
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      Returns a list of games with pagination support.
+    </p>
+
+    <h3 class="font-semibold text-lg mb-2">Parameters</h3>
+    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden mb-4">
+      <div class="parameter">
+        <div>
+          <span class="font-medium">page</span>
+          <span class="text-gray-500 dark:text-gray-400 text-sm ml-2">(optional)</span>
+        </div>
+        <div class="text-gray-600 dark:text-gray-400 text-sm">Page number to retrieve (default: 1)</div>
+      </div>
+      <div class="parameter">
+        <div>
+          <span class="font-medium">category</span>
+          <span class="text-gray-500 dark:text-gray-400 text-sm ml-2">(optional)</span>
+        </div>
+        <div class="text-gray-600 dark:text-gray-400 text-sm">Filter games by category slug</div>
+      </div>
+    </div>
+
+    <h3 class="font-semibold text-lg mb-2">Example Request</h3>
+    <div class="code-block mb-4">GET {{ request.url_root }}api/games?page=1&category=action</div>
+
+    <h3 class="font-semibold text-lg mb-2">Example Response</h3>
+    <div class="code-block">
+{
+  "status": "success",
+  "games": [
+    {
+      "title": "Game Title",
+      "url": "https://www.ovagames.com/game-url",
+      "image": "https://www.ovagames.com/image.jpg",
+      "release_date": "May 5, 2023"
+    },
+    ...
+  ],
+  "has_next": true,
+  "current_page": 1
+}</div>
+  </div>
+
+  <!-- Game Details Endpoint -->
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 api-endpoint">
+    <div class="flex items-center mb-4">
+      <span class="px-2 py-1 text-xs font-bold text-white bg-green-600 rounded-md mr-3">GET</span>
+      <h2 class="text-xl font-semibold">/api/game</h2>
+    </div>
+
+    <p class="text-gray-700 dark:text-gray-300 mb-4">
+      Returns detailed information about a specific game.
+    </p>
+
+    <h3 class="font-semibold text-lg mb-2">Parameters</h3>
+    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden mb-4">
+      <div class="parameter">
+        <div>
+          <span class="font-medium">url</span>
+          <span class="text-red-500 dark:text-red-400 text-sm ml-2">(required)</span>
+        </div>
+        <div class="text-gray-600 dark:text-gray-400 text-sm">Full URL of the game page</div>
+      </div>
+    </div>
+
+    <h3 class="font-semibold text-lg mb-2">Example Request</h3>
+    <div class="code-block mb-4">GET {{ request.url_root }}api/game?url=https://www.ovagames.com/game-url</div>
+
+    <h3 class="font-semibold text-lg mb-2">Example Response</h3>
+    <div class="code-block">
+{
+  "status": "success",
+  "title": "Game Title",
+  "genre": "Action",
+  "developer": "Developer Name",
+  "publisher": "Publisher Name",
+  "release_date": "May 5, 2023",
+  "cover_image": "https://www.ovagames.com/cover.jpg",
+  "description": "Game description text...",
+  "system_requirements": "System requirements text...",
+  "screenshots": [
+    "https://www.ovagames.com/screenshot1.jpg",
+    "https://www.ovagames.com/screenshot2.jpg"
+  ],
+  "download_links": [
+    "https://download-link-1.com",
+    "https://download-link-2.com"
+  ],
+  "download_password": "password123",
+  "related_games": [
+    {
+      "title": "Related Game 1",
+      "url": "https://www.ovagames.com/related-game-1",
+      "image": "https://www.ovagames.com/related-image-1.jpg"
+    },
+    ...
+  ]
+}</div>
+  </div>
+
+  <!-- Search Endpoint -->
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 api-endpoint">
+    <div class="flex items-center mb-4">
+      <span class="px-2 py-1 text-xs font-bold text-white bg-green-600 rounded-md mr-3">GET

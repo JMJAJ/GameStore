@@ -1,19 +1,33 @@
 {% extends "layout.html" %}
 
-{% block title %}All Games | GameStore Catalog{% endblock %}
+{% block title %}Search Results: {{ query }} | GameStore Catalog{% endblock %}
 
 {% block content %}
 
-{# Title for the aggregated view #}
-<h1 class="text-2xl sm:text-3xl font-bold mb-8">All Games <span class="text-base font-normal text-gray-500 dark:text-gray-400">(Page {{ page }})</span></h1>
+<h1 class="text-2xl md:text-3xl font-bold mb-2">Search Results for: "{{ query }}"</h1>
+<p class="text-gray-600 dark:text-gray-400 mb-8">
+    {# Display count of de-duplicated results #}
+    Found {{ games|length }} {% if games|length >= 50 %}top {% endif %}results across all sites.
+</p>
 
-{# Categories are disabled for the 'all' view #}
-{# {% if categories %} ... {% endif %} #}
+{# Display fetch errors if any occurred during search #}
+{% if fetch_errors %}
+  <div class="mb-6 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md shadow-sm" role="alert">
+    <p class="font-bold">Error Searching Some Sites:</p>
+    <ul class="mt-2 list-disc list-inside text-sm">
+      {% for error in fetch_errors %}
+        <li>{{ error | safe }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
 
-<!-- Games Grid -->
+
+{% if games %}
+{# Use the same grid layout as index.html #}
 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
   {% for game in games %}
-    {# Link now needs site param for view_game #}
+    {# Each card links to the specific game detail page, including the site param #}
     <a href="{{ url_for('web.view_game') }}?url={{ game.url | urlencode }}&site={{ game.site }}"
        class="group game-card block bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out">
         <div class="relative pb-[56.25%] bg-gray-200 dark:bg-gray-700"> {# Aspect ratio padding #}
@@ -42,35 +56,26 @@
           </div>
         </div>
     </a>
-  {% else %}
-   <p class="sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5 text-center text-gray-500 dark:text-gray-400 py-10">No games found on this page.</p>
   {% endfor %}
 </div>
-
-<!-- Pagination -->
-<div class="mt-10 flex justify-between items-center">
-  <div>
-    {% if page > 1 %}
-      {# Link to the aggregated view route #}
-      <a href="{{ url_for('web.view_games_all', page=page-1) }}"
-         class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium transition-colors">
-        <i class="fas fa-chevron-left mr-2"></i> Previous
-      </a>
-    {% endif %}
+{% else %}
+{# No results message remains the same #}
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center max-w-lg mx-auto">
+  <div class="text-gray-400 dark:text-gray-500 mb-4">
+    <i class="fas fa-search fa-4x"></i>
   </div>
-
-  <div class="text-sm text-gray-600 dark:text-gray-400">
-    Page {{ page }}
-  </div>
-
-  <div>
-    {% if has_next %}
-      {# Link to the aggregated view route #}
-      <a href="{{ url_for('web.view_games_all', page=page+1) }}"
-         class="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium transition-colors">
-        Next <i class="fas fa-chevron-right ml-2"></i>
-      </a>
-    {% endif %}
+  <h2 class="text-2xl font-bold mb-2">No results found</h2>
+  <p class="text-gray-600 dark:text-gray-400 mb-6">
+    We couldn't find any games matching "{{ query }}" across the supported sites.
+  </p>
+  <div class="flex justify-center">
+     <a href="{{ url_for('web.view_games_all', page=1) }}" class="inline-flex items-center justify-center px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium transition-colors">
+      <i class="fas fa-list-alt mr-2"></i> Browse All Games
+    </a>
   </div>
 </div>
+{% endif %}
+
+{# Remove pagination from search results for simplicity #}
+
 {% endblock %}

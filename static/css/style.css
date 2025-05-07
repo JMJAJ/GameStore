@@ -1,3 +1,86 @@
-body { background-color: #f3f4f6; }
-.container { max-width: 1280px; }
-.prose { max-width: 100%; }
+/* Base styles */
+body {
+  background-color: #f3f4f6;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+.dark body {
+  background-color: #111827;
+}
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.prose {
+  max-width: 100%;
+}
+
+/* Card styles */
+.game-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.game-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+.dark .game-card:hover {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+/* Button styles */
+.btn {
+  transition: all 0.2s ease;
+}
+.btn:hover {
+  transform: translateY(-1px);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+
+/* API documentation styles */
+.api-section {
+  border-left: 4px solid #0ea5e9;
+  padding-left: 1rem;
+  margin-bottom: 2rem;
+}
+.code-block {
+  font-family: 'Courier New', monospace;
+  background-color: #1e293b;
+  color: #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+.dark .code-block {
+  background-color: #0f172a;
+}
+.code-comment {
+  color: #94a3b8;
+}
+.code-string {
+  color: #a5d6ff;
+}
+.code-keyword {
+  color: #ff7b72;
+}
+.code-function {
+  color: #d2a8ff;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}

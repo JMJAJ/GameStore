@@ -1,112 +1,174 @@
-from flask import Flask, request, jsonify, render_template, url_for, redirect
-import requests
-from bs4 import BeautifulSoup
+from flask import Flask, request, jsonify, render_template, url_for, redirect, send_from_directory, current_app
+import os
+import time
+import logging
+import datetime
+from urllib.parse import quote, urlparse
+from functools import wraps
+from scrapers import ScraperFactory
+from scrapers import BaseScraper
+from version import VERSION, BUILD_DATE # Make sure version.py exists
+from dotenv import load_dotenv
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from typing import Callable, Any, Dict, Tuple, Optional
 
-app = Flask(__name__)
-BASE_URL = "https://www.ovagames.com"
-HEADERS = {"User-Agent": "Mozilla/5.0"}
+# Load environment variables from .env file
+load_dotenv()
 
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-def get_soup(url):
-    res = requests.get(url, headers=HEADERS, timeout=10)
-    res.raise_for_status()
-    return BeautifulSoup(res.text, "html.parser")
+def nl2br(value):
+    """Converts newlines in a string to HTML <br> tags."""
+    if not isinstance(value, str): return value
+    return re.sub(r'(?:\r\n|\r|\n)', '<br>\n', value)
 
+# NEW: Custom filter to extract hostname
+def get_hostname(url_string):
+    """Jinja filter to extract hostname from a URL."""
+    if not isinstance(url_string, str): return ''
+    try:
+        parsed = urlparse(url_string)
+        hostname = parsed.netloc.replace('www.', '')
+        return hostname.split('.')[0]
+    except Exception:
+        return ''
 
-def scrape_games_list(page=1):
-    url = f"{BASE_URL}/page/{page}/" if page > 1 else BASE_URL
-    soup = get_soup(url)
-    games = []
-    # Use .post-inside to select each game card
-    for post in soup.select(".post-inside"):  
-        a = post.select_one(".post-inside a[href]")
-        if not a:
-            continue
-        title = a.get_text(strip=True)
-        link = a['href']
-        img = post.select_one(".post-wrapper img[src]")
-        img_url = img['src'] if img else url_for('static', filename='css/fallback.png')
-        games.append({
-            "title": title,
-            "url": link,
-            "image": img_url
-        })
-    has_next = bool(soup.select_one(".wp-pagenavi a.nextpostslink"))
-    return games, has_next
+# Create Flask application
+def create_app(config: Optional[Dict[str, Any]] = None) -> Flask:
+    app = Flask(__name__)
+    
+    # Default configuration
+    app.config.update(
+        CACHE_DIR=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cache'),
+        CACHE_TIMEOUT=3600,  # 1 hour in seconds
+        DEFAULT_SITE="gamepciso",
+        DEBUG=False,
+        VERSION=VERSION,
+        BUILD_DATE=BUILD_DATE,
+        # Rate Limiter Config
+        RATELIMIT_API_ENABLED=os.environ.get('GAMESTORE_API_RATELIMIT_ENABLED', 'True').lower() == 'true',
+        RATELIMIT_API_GAMES=os.environ.get('GAMESTORE_API_RATELIMIT_GAMES', '100 per hour'),
+        RATELIMIT_API_GAME_DETAILS=os.environ.get('GAMESTORE_API_RATELIMIT_GAME_DETAILS', '60 per hour'),
+        RATELIMIT_API_SEARCH=os.environ.get('GAMESTORE_API_RATELIMIT_SEARCH', '120 per hour'),
+        RATELIMIT_API_SITES=os.environ.get('GAMESTORE_API_RATELIMIT_SITES', '200 per hour')
+    )
+    
+    # Override with environment variables
+    app.config['CACHE_DIR'] = os.environ.get('GAMESTORE_CACHE_DIR', app.config['CACHE_DIR'])
+    app.config['CACHE_TIMEOUT'] = int(os.environ.get('GAMESTORE_CACHE_TIMEOUT', app.config['CACHE_TIMEOUT']))
+    app.config['DEFAULT_SITE'] = os.environ.get('GAMESTORE_DEFAULT_SITE', app.config['DEFAULT_SITE'])
+    app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 
+    # Initialize Flask-Limiter
+    limiter = Limiter(
+        get_remote_address,
+        app=app, # Initialize with app directly
+        default_limits=["200 per day", "50 per hour"],
+        storage_uri="memory://",
+        enabled=app.config['RATELIMIT_API_ENABLED']
+    )
+    
+    # Override with custom configuration if provided
+    if config:
+        app.config.update(config)
+    
+    # Ensure cache directory exists
+    os.makedirs(app.config['CACHE_DIR'], exist_ok=True)
+    
+    # Initialize scraper factory
+    scraper_factory = ScraperFactory() # This line works
+    app.config['scraper_factory'] = scraper_factory
+    logger.info(f"ScraperFactory instance created: {scraper_factory}")
+    
+    # Log discovered scrapers
+    logger.info(f"Discovered {len(scraper_factory.scrapers)} scrapers:")
+    for site_id_key in scraper_factory.scrapers:
+        logger.info(f"  - {site_id_key}")
 
-def scrape_game_details(page_url):
-    soup = get_soup(page_url)
-    # Extract top metadata from strong tags in the first content block
-    meta = {}
-    for strong in soup.select(".post-content p strong"):
-        text = strong.get_text(strip=True)
-        if ':' in text:
-            key, val = text.split(':', 1)
-            meta[key.strip().lower().replace(' ', '_')] = val.strip()
-    # Title fallback
-    if 'title' not in meta:
-        h1 = soup.select_one(".post-content h1")
-        meta['title'] = h1.get_text(strip=True) if h1 else None
-    # Tabs
-    description = ''
-    desc_div = soup.select_one("#description .wp-tab-content-wrapper")
-    if desc_div:
-        description = desc_div.get_text(separator="\n", strip=True)
-    sysreq = ''
-    sys_div = soup.select_one("#system_requirements .wp-tab-content-wrapper")
-    if sys_div:
-        sysreq = sys_div.get_text(separator="\n", strip=True)
-    # Screenshots
-    screenshots = [img['src'] for img in soup.select("#description + ul img, .wp-tab-content-wrapper img[src]")]
-    # Download links & password
-    downloads = [a['href'] for a in soup.select(".dl-wraps-item a[href]")]
-    pwd = ''
-    pwd_tag = soup.select_one(".su-box-content")
-    if pwd_tag:
-        pwd = pwd_tag.get_text(strip=True)
-    return meta, description, sysreq, screenshots, downloads, pwd
+    # DEBUGGING IMPORT ISSUE:
+    import sys
+    logger.info("---- DEBUGGING START ----")
+    logger.info(f"Current sys.path: {sys.path}")
+    logger.info(f"'scrapers' in sys.modules: {'scrapers' in sys.modules}")
+    if 'scrapers' in sys.modules:
+        import scrapers # Re-import to get the module object
+        logger.info(f"scrapers module object: {scrapers}")
+        logger.info(f"scrapers.__file__: {getattr(scrapers, '__file__', 'N/A')}")
+        logger.info(f"dir(scrapers): {dir(scrapers)}")
+        logger.info(f"hasattr(scrapers, 'ScraperFactory'): {hasattr(scrapers, 'ScraperFactory')}")
+        if hasattr(scrapers, 'ScraperFactory'):
+            logger.info(f"scrapers.ScraperFactory object: {scrapers.ScraperFactory}")
+    logger.info("---- DEBUGGING END ----")
+    
+    # Register blueprints
+    from routes.web import web_bp
+    from routes.api import api_bp, initialize_limiter_for_api
+    
+    app.register_blueprint(web_bp)
+    initialize_limiter_for_api(limiter)
+    app.register_blueprint(api_bp, url_prefix='/api')
+    
+    # Error handlers
+    @app.errorhandler(404)
+    def page_not_found(e: Exception) -> Tuple[str, int]:
+        """Handle 404 errors"""
+        dark_mode = request.cookies.get('dark_mode', 'false')
+        if request.blueprint == 'api':
+             return jsonify({
+                "status": "error",
+                "message": "API endpoint not found.",
+                "code": "ENDPOINT_NOT_FOUND"
+            }), 404
+        return render_template('error.html', message="Page not found", dark_mode=dark_mode), 404
 
+    @app.errorhandler(500)
+    def server_error(e: Exception) -> Tuple[str, int]:
+        """Handle 500 errors"""
+        logger.error(f"Server Error: {e}", exc_info=True)
+        dark_mode = request.cookies.get('dark_mode', 'false')
+        if request.blueprint == 'api':
+             return jsonify({
+                "status": "error",
+                "message": "An internal server error occurred.",
+                "code": "INTERNAL_SERVER_ERROR"
+            }), 500
+        return render_template('error.html', message="Internal server error", dark_mode=dark_mode), 500
+    
+    @app.errorhandler(429)
+    def ratelimit_handler(e: Any) -> Tuple[Dict[str, str], int]:
+        """Handle rate limit errors for API"""
+        return jsonify(
+            status="error",
+            message=f"Rate limit exceeded: {e.description}",
+            code="RATE_LIMIT_EXCEEDED"
+        ), 429
 
-@app.route('/')
-def home():
-    return redirect(url_for('view_games', page=1))
+    # Register custom filters
+    app.jinja_env.filters['nl2br'] = nl2br
+    app.jinja_env.filters['hostname'] = get_hostname # <-- Register the new filter
 
+    # Context processor to add version to all templates
+    @app.context_processor
+    def inject_global_template_vars() -> Dict[str, Any]:
+        # Ensure default_site_id always has a value
+        default_site = app.config.get('DEFAULT_SITE', 'gamepciso') # Provide a fallback default
+        return {
+            'version': app.config.get('VERSION', 'N/A'),
+            'build_date': app.config.get('BUILD_DATE', 'N/A'),
+            'current_year': datetime.datetime.utcnow().year,
+            'default_site_id': default_site
+        }
 
-@app.route('/games/<int:page>')
-def view_games(page):
-    games, has_next = scrape_games_list(page)
-    return render_template('index.html', games=games, page=page, has_next=has_next)
+    return app
 
+# Create application instance for direct running
+app = create_app()
 
-@app.route('/game')
-def view_game():
-    game_url = request.args.get('url')
-    if not game_url:
-        return redirect(url_for('home'))
-    meta, description, sysreq, screenshots, downloads, password = scrape_game_details(game_url)
-    return render_template('game.html', meta=meta, description=description,
-                           sysreq=sysreq, screenshots=screenshots,
-                           downloads=downloads, password=password)
-
-
-@app.route('/api/games')
-def api_games():
-    page = int(request.args.get('page', 1))
-    games, has_next = scrape_games_list(page)
-    return jsonify({"games": games, "has_next": has_next})
-
-
-@app.route('/api/game')
-def api_game():
-    url = request.args.get('url')
-    meta, description, sysreq, screenshots, downloads, password = scrape_game_details(url)
-    return jsonify({**meta, "description": description,
-                    "system_requirements": sysreq,
-                    "screenshots": screenshots,
-                    "download_links": downloads,
-                    "download_password": password})
-
-
+# Run the app if executed directly
 if __name__ == '__main__':
-    app.run(debug=True)
+    logger.info(f"Starting GameStore v{app.config['VERSION']}")
+    app.run(debug=app.config['DEBUG'], host='0.0.0.0', port=5000)

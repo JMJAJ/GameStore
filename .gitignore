@@ -1,0 +1,5 @@
+cache/
+**/__pycache__/
+fun.md
+_root.txt
+test_ova.py

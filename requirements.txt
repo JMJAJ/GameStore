@@ -1,3 +1,5 @@
-Flask
-requests
-beautifulsoup4
+Flask>=2.0
+requests>=2.25
+beautifulsoup4>=4.9
+python-dotenv>=0.19
+Flask-Limiter>=2.0
