@@ -3,3 +3,5 @@ requests>=2.25
 beautifulsoup4>=4.9
 python-dotenv>=0.19
 Flask-Limiter>=2.0
+free-proxy>=1.1.1
+colorama>=0.4

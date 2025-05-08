@@ -3,325 +3,206 @@
 {% block title %}{{ meta.title | striptags | escape or 'Game Details' }} | {{ sites|selectattr('id', 'equalto', site)|map(attribute='name')|first }}{% endblock %}
 
 {% block extra_head %}
-{# Optional: Add lightbox CSS here if you implement one #}
 <style>
-  .metadata-grid { grid-template-columns: auto 1fr; }
-  .metadata-label { @apply font-semibold text-gray-700 dark:text-gray-300; }
-  .metadata-value { @apply text-gray-600 dark:text-gray-400; }
+  /* Custom styles for game page v3 */
+  .metadata-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; align-items: center; }
+  .metadata-label { @apply font-semibold text-sm text-gray-600 dark:text-gray-400 text-right; }
+  .metadata-value { @apply text-sm text-gray-800 dark:text-gray-200 break-words; }
 
-  .tab-btn-v2 {
-    @apply flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-primary-600 hover:border-primary-500 dark:hover:text-primary-400 dark:hover:border-primary-400 focus:outline-none transition-all duration-150 ease-in-out;
+  .tab-btn-v3 {
+    @apply relative flex items-center gap-2 px-1 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-primary-600 hover:border-primary-300 dark:hover:text-primary-400 dark:hover:border-primary-400 focus:outline-none focus:z-10 transition-all duration-150 ease-in-out;
   }
-  .tab-btn-v2.active {
+  .tab-btn-v3.active {
     @apply border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400 font-semibold;
   }
-  .tab-content-v2 { display: none; }
-  .tab-content-v2.active { display: block; }
+  .tab-content-v3 { display: none; }
+  .tab-content-v3.active { display: block; }
 
-  .download-group-v2 {
-    @apply mb-5 border border-gray-200 dark:border-gray-700 rounded-md shadow-sm;
-  }
-  .download-group-title-v2 {
-     @apply px-4 py-2 bg-gray-50 dark:bg-gray-750 font-semibold text-base border-b border-gray-200 dark:border-gray-700 rounded-t-md;
-  }
-  .download-section-v2 { @apply p-4 space-y-3; }
-  .download-section-title-v2 { @apply text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2; }
-  .download-link-item-v2 {
-      @apply flex items-center justify-between gap-3 px-3 py-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-600 transition-colors;
-  }
-  .download-link-item-v2 a {
-      @apply text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 text-sm font-medium break-all flex-1;
-  }
-  .download-link-item-v2 .host-badge {
-      @apply text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 whitespace-nowrap ml-2;
-  }
+  .download-group-v3 { @apply mb-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden; }
+  .download-group-title-v3 { @apply px-5 py-3 bg-gray-50 dark:bg-gray-750 font-semibold text-lg border-b border-gray-200 dark:border-gray-700; }
 
-  .screenshot-gallery-v2 {
-      @apply grid grid-cols-2 md:grid-cols-3 gap-3;
-   }
-   .screenshot-item-v2 {
-       @apply block relative aspect-video bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden shadow group transition-shadow hover:shadow-lg;
-   }
-   .screenshot-item-v2 img {
-       @apply absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105;
-   }
-   .screenshot-item-v2 .overlay {
-       @apply absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity duration-200 flex items-center justify-center;
-   }
-   .screenshot-item-v2 .overlay i {
-       @apply text-white text-3xl opacity-0 group-hover:opacity-90 transition-opacity duration-200;
-   }
-   /* Fix for prose within tabs */
-    .prose { max-width: 100% !important; } /* Override default max-width */
-    .prose pre { @apply bg-gray-100 dark:bg-gray-700 p-3 rounded text-xs font-mono leading-relaxed; } /* Style pre for sysreq */
+  /* Table Styles for Downloads */
+  .download-table { @apply min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm; }
+  .download-table th { @apply px-4 py-2 bg-gray-100 dark:bg-gray-700 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap; }
+  .download-table td { @apply px-4 py-3 whitespace-nowrap; }
+  .download-table .part-name { @apply font-medium text-gray-800 dark:text-gray-200; }
+  .download-table .link-cell a { @apply text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium inline-flex items-center gap-1; }
+  .download-table .password-hint-v3 { @apply text-amber-600 dark:text-amber-500 text-[10px] font-mono whitespace-nowrap bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded; }
+
+
+  /* List Styles for Mirrors/Paragraph Links */
+  .download-list { @apply space-y-2 p-4 sm:p-5; }
+  .download-list-item { @apply flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 py-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-200 dark:border-gray-700; }
+  .download-list-item a { @apply inline-flex items-center gap-1.5 text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium break-all text-sm; }
+  .download-list-item .link-info { @apply flex items-center gap-2 mt-1 sm:mt-0; }
+  .download-list-item .host-badge-v3 { @apply text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 whitespace-nowrap; }
+  .download-list-item .password-hint-v3 { @apply text-amber-600 dark:text-amber-500 text-[10px] font-mono whitespace-nowrap bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded; }
+
+
+  .screenshot-gallery-v3 { @apply grid grid-cols-2 md:grid-cols-3 gap-4; }
+  .screenshot-item-v3 { @apply block relative aspect-video bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden shadow group transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800; }
+  .screenshot-item-v3 img { @apply absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105; }
+  .screenshot-item-v3 .overlay { @apply absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity duration-200 flex items-center justify-center; }
+  .screenshot-item-v3 .overlay i { @apply text-white text-4xl opacity-0 group-hover:opacity-90 transition-opacity duration-200 drop-shadow-lg; }
+
+  .prose { max-width: 100% !important; }
+  .prose pre { @apply bg-gray-100 dark:bg-gray-700 p-3 rounded text-xs font-mono leading-relaxed overflow-x-auto; }
+  .video-container-v3 { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #000; border-radius: 0.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+  .video-container-v3 iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="mb-6">
-  <a href="{{ url_for('web.view_games', site=site, page=1) }}" class="inline-flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400">
-    <i class="fas fa-arrow-left fa-fw"></i>
-    <span>Back to {{ sites|selectattr('id', 'equalto', site)|map(attribute='name')|first }} Catalog</span>
-  </a>
-</div>
+<div class="mb-6"> <a href="{{ url_for('web.view_games_all', page=1) }}" class="inline-flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"> <i class="fas fa-arrow-left fa-fw"></i> <span>Back to Catalog</span> </a> </div>
+<div class="flex flex-col lg:flex-row gap-8 xl:gap-10">
+  <aside class="w-full lg:w-[300px] xl:w-[340px] flex-shrink-0 space-y-6 lg:sticky lg:top-20 self-start">
+    <div class="aspect-[3/4] rounded-lg overflow-hidden shadow-xl bg-gray-300 dark:bg-gray-700 border-4 border-white dark:border-gray-800"> <img src="{{ meta.image or url_for('static', filename='images/fallback.svg') }}" alt="{{ meta.title }} Cover" class="w-full h-full object-cover" data-fallback="{{ url_for('static', filename='images/fallback.svg') }}"> </div>
+    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md"> <h2 class="text-xl font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 text-gray-800 dark:text-gray-100">Game Details</h2> <div class="metadata-grid"> {% if meta.genre %}<span class="metadata-label">Genre</span> <span class="metadata-value">{{ meta.genre }}</span>{% endif %} {% if meta.release_date %}<span class="metadata-label">Release</span> <span class="metadata-value">{{ meta.release_date }}</span>{% endif %} {% if meta.developer %}<span class="metadata-label">Developer</span> <span class="metadata-value">{{ meta.developer }}</span>{% endif %} {% if meta.publisher %}<span class="metadata-label">Publisher</span> <span class="metadata-value">{{ meta.publisher }}</span>{% endif %} {% if meta.language %}<span class="metadata-label">Languages</span> <span class="metadata-value">{{ meta.language }}</span>{% endif %} <span class="metadata-label">Source</span> <span class="metadata-value">{{ sites|selectattr('id', 'equalto', site)|map(attribute='name')|first }}</span> <span class="metadata-label">URL</span> <span class="metadata-value"><a href="{{ meta.url }}" target="_blank" rel="noopener noreferrer nofollow" class="text-primary-600 hover:underline dark:text-primary-400 break-all">View Original</a></span> </div> </div>
+    {% if related %} <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md"> <h2 class="text-xl font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 text-gray-800 dark:text-gray-100">Related</h2> <div class="space-y-3"> {% for game in related[:5] %} <a href="{{ url_for('web.view_game') }}?url={{ game.url | urlencode }}&site={{ game.site }}" class="flex items-center gap-3 group hover:bg-gray-50 dark:hover:bg-gray-700 p-1 rounded -m-2"> <div class="w-20 h-11 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden flex-shrink-0"> <img src="{{ game.image or url_for('static', filename='images/fallback.svg') }}" alt="{{ game.title }}" class="w-full h-full object-cover" loading="lazy" data-fallback="{{ url_for('static', filename='images/fallback.svg') }}"> </div> <span class="text-xs font-medium line-clamp-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">{{ game.title }}</span> </a> {% endfor %} </div> </div> {% endif %}
+  </aside>
 
-<div class="flex flex-col lg:flex-row gap-8">
+  <div class="w-full lg:flex-1 min-w-0 space-y-8">
+    <h1 class="text-3xl lg:text-4xl xl:text-5xl font-bold text-gray-900 dark:text-gray-50 break-words">{{ meta.title }}</h1>
+    {% if meta.video_embed_url %} <div class="space-y-3"> <div class="video-container-v3"> <iframe src="{{ meta.video_embed_url }}" title="{{ meta.title }} Video Trailer" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen=""></iframe> </div> </div> {% endif %}
 
-  {# --- Left Column (Cover, Meta, Related) --- #}
-  <div class="w-full lg:w-1/3 xl:w-1/4 flex-shrink-0 space-y-6">
-    {# Cover Image #}
-    <div class="aspect-[3/4] rounded-lg overflow-hidden shadow-lg bg-gray-300 dark:bg-gray-700">
-      <img src="{{ meta.image or url_for('static', filename='images/fallback.svg') }}" alt="{{ meta.title }} Cover" class="w-full h-full object-cover" data-fallback="{{ url_for('static', filename='images/fallback.svg') }}">
-    </div>
-
-    {# Metadata Section #}
-    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-        <h2 class="text-lg font-semibold mb-3 border-b border-gray-200 dark:border-gray-700 pb-2">Game Details</h2>
-        <div class="grid metadata-grid gap-x-3 gap-y-1.5 text-sm">
-             <span class="metadata-label">Title:</span> <span class="metadata-value">{{ meta.title }}</span>
-            {% if meta.genre %}
-                <span class="metadata-label">Genre:</span> <span class="metadata-value">{{ meta.genre }}</span>
-            {% endif %}
-            {% if meta.release_date %}
-                <span class="metadata-label">Release:</span> <span class="metadata-value">{{ meta.release_date }}</span>
-            {% endif %}
-             {% if meta.developer %}
-                 <span class="metadata-label">Developer:</span> <span class="metadata-value">{{ meta.developer }}</span>
-             {% endif %}
-             {% if meta.publisher %}
-                 <span class="metadata-label">Publisher:</span> <span class="metadata-value">{{ meta.publisher }}</span>
-             {% endif %}
-             {% if meta.language %}
-                 <span class="metadata-label">Languages:</span> <span class="metadata-value">{{ meta.language }}</span>
-             {% endif %}
-             <span class="metadata-label">Source:</span> <span class="metadata-value">{{ sites|selectattr('id', 'equalto', site)|map(attribute='name')|first }}</span>
-             <span class="metadata-label">URL:</span> <span class="metadata-value"><a href="{{ meta.url }}" target="_blank" rel="noopener noreferrer nofollow" class="text-primary-600 hover:underline dark:text-primary-400 break-all">View Original</a></span>
-        </div>
-    </div>
-
-     {# Related Games (Optional in Sidebar) #}
-     {% if related %}
-     <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-         <h2 class="text-lg font-semibold mb-3 border-b border-gray-200 dark:border-gray-700 pb-2">Related Games</h2>
-         <div class="space-y-3">
-             {% for game in related[:4] %} {# Limit related in sidebar #}
-             <a href="{{ url_for('web.view_game') }}?url={{ game.url | urlencode }}&site={{ game.site }}" class="flex items-center gap-3 group hover:bg-gray-50 dark:hover:bg-gray-700 p-1 rounded -mx-1">
-                <div class="w-16 h-10 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden flex-shrink-0">
-                     <img src="{{ game.image or url_for('static', filename='images/fallback.svg') }}" alt="{{ game.title }}" class="w-full h-full object-cover" loading="lazy" data-fallback="{{ url_for('static', filename='images/fallback.svg') }}">
-                </div>
-                <span class="text-xs font-medium line-clamp-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">{{ game.title }}</span>
-             </a>
-             {% endfor %}
-         </div>
-     </div>
-     {% endif %}
-
-  </div>{# --- End Left Column --- #}
-
-
-  {# --- Right Column (Tabs) --- #}
-  <div class="w-full lg:w-2/3 xl:w-3/4 min-w-0">
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-          {# Tab Navigation #}
-          <div class="border-b border-gray-200 dark:border-gray-700">
-            <nav class="-mb-px flex space-x-1 sm:space-x-3 overflow-x-auto px-4" aria-label="Tabs">
-              <button class="tab-btn-v2 active" data-tab="description-v2">
-                <i class="fas fa-info-circle fa-fw"></i><span class="hidden sm:inline">Description</span>
-              </button>
-              <button class="tab-btn-v2" data-tab="sysreq-v2">
-                <i class="fas fa-laptop-code fa-fw"></i><span class="hidden sm:inline">System Requirements</span>
-              </button>
-              {% if screenshots %}
-              <button class="tab-btn-v2" data-tab="screenshots-v2">
-                <i class="fas fa-images fa-fw"></i><span class="hidden sm:inline">Screenshots</span> ({{ screenshots|length }})
-              </button>
-              {% endif %}
-              {% if downloads %}
-              <button class="tab-btn-v2" data-tab="download-v2">
-                <i class="fas fa-download fa-fw"></i><span class="hidden sm:inline">Downloads</span>
-              </button>
-              {% endif %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+        <div class="border-b border-gray-200 dark:border-gray-700">
+            <nav class="-mb-px flex space-x-1 sm:space-x-3 overflow-x-auto px-4 sm:px-6" aria-label="Tabs">
+              <button class="tab-btn-v3 active" data-tab="description-v3"> <i class="fas fa-info-circle fa-fw"></i><span class="hidden sm:inline">Description</span> </button>
+              <button class="tab-btn-v3" data-tab="sysreq-v3"> <i class="fas fa-laptop-code fa-fw"></i><span class="hidden sm:inline">System Requirements</span> </button>
+              {% if screenshots %}<button class="tab-btn-v3" data-tab="screenshots-v3"> <i class="fas fa-images fa-fw"></i><span class="hidden sm:inline">Screenshots</span><span class="ml-1.5 text-xs bg-gray-200 dark:bg-gray-700 rounded-full px-1.5 py-0.5">{{ screenshots|length }}</span> </button>{% endif %}
+              {% if downloads %}<button class="tab-btn-v3" data-tab="download-v3"> <i class="fas fa-download fa-fw"></i><span class="hidden sm:inline">Downloads</span> </button>{% endif %}
             </nav>
-          </div>
+        </div>
 
-           {# Tab Content Area #}
-           <div class="p-4 sm:p-6">
-               {# Description Tab #}
-               <div id="description-v2-tab" class="tab-content-v2 active">
-                   <div class="prose prose-sm sm:prose-base max-w-none dark:prose-invert">
-                       {% if description %}
-                           {# Use CSS to handle whitespace, no nl2br needed #}
-                           <div class="whitespace-pre-wrap">{{ description }}</div>
-                       {% else %}
-                           <p class="text-gray-500 italic">No description available.</p>
-                       {% endif %}
-                   </div>
-               </div>
+         <div class="p-5 sm:p-6">
+             <div id="description-v3-tab" class="tab-content-v3 active"> <div class="prose prose-sm sm:prose-base max-w-none dark:prose-invert"> {% if description %} <div class="whitespace-pre-wrap">{{ description }}</div> {% else %} <p class="text-gray-500 italic">No description available.</p> {% endif %} </div> </div>
+             {% if meta.video_embed_url %}<div id="trailer-v3-tab" class="tab-content-v3"> <div class="video-container-v3"> <iframe src="{{ meta.video_embed_url }}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen=""></iframe> </div> </div>{% endif %}
+             <div id="sysreq-v3-tab" class="tab-content-v3"> {% if sysreq %} {% set req_sections = sysreq.split('Recommended:') %} <div class="space-y-4"> <div> <h4 class="font-semibold text-base mb-1 text-gray-800 dark:text-gray-200">Minimum:</h4> <pre>{{ req_sections[0].replace('Minimum:', '').strip() }}</pre> </div> {% if req_sections|length > 1 %} <div> <h4 class="font-semibold text-base mb-1 text-gray-800 dark:text-gray-200">Recommended:</h4> <pre>{{ req_sections[1].strip() }}</pre> </div> {% endif %} </div> {% else %} <p class="text-gray-500 italic">No system requirements listed.</p> {% endif %} </div>
+             {% if screenshots %}<div id="screenshots-v3-tab" class="tab-content-v3"> <div class="screenshot-gallery-v3 simple-lightbox"> {% for img in screenshots %} <a href="{{ img }}" class="screenshot-item-v3" target="_blank" rel="noopener noreferrer"> <img loading="lazy" src="{{ img }}" alt="Screenshot {{ loop.index }}" data-fallback="{{ url_for('static', filename='images/fallback.svg') }}"> <div class="overlay"><i class="fas fa-expand-arrows-alt"></i></div> </a> {% endfor %} </div> </div>{% endif %}
 
-               {# System Requirements Tab #}
-               <div id="sysreq-v2-tab" class="tab-content-v2">
-                   {% if sysreq %}
-                       {% set req_sections = sysreq.split('Recommended:') %}
-                       <div class="space-y-4">
-                           <div>
-                               <h4 class="font-semibold text-base mb-1 text-gray-800 dark:text-gray-200">Minimum:</h4>
-                               <pre>{{ req_sections[0].replace('Minimum:', '').strip() }}</pre> {# Apply prose pre styles via style block or direct class #}
-                           </div>
-                           {% if req_sections|length > 1 %}
-                           <div>
-                               <h4 class="font-semibold text-base mb-1 text-gray-800 dark:text-gray-200">Recommended:</h4>
-                               <pre>{{ req_sections[1].strip() }}</pre> {# Apply prose pre styles via style block or direct class #}
-                           </div>
-                           {% endif %}
-                       </div>
-                   {% else %}
-                       <p class="text-gray-500 italic">No system requirements listed.</p>
-                   {% endif %}
-               </div>
+             <div id="download-v3-tab" class="tab-content-v3">
+                 {% if downloads %}
+                    {% if password %} <div class="mb-6 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700/50 p-4 rounded-lg shadow-sm"> <div class="flex items-center"> <div class="flex-shrink-0"><i class="fas fa-key text-amber-600 dark:text-amber-400 text-xl fa-fw"></i></div> <div class="ml-3"> <h3 class="text-base font-semibold text-amber-800 dark:text-amber-200">Download Password</h3> <div class="mt-1 text-sm text-amber-700 dark:text-amber-300"> <code class="bg-amber-200 dark:bg-gray-700 px-2 py-1 rounded select-all font-mono text-sm">{{ password }}</code> </div> </div> </div> </div> {% endif %}
 
-                {# Screenshots Tab #}
-                {% if screenshots %}
-                <div id="screenshots-v2-tab" class="tab-content-v2">
-                    <div class="screenshot-gallery-v2 simple-lightbox">
-                        {% for img in screenshots %}
-                        <a href="{{ img }}" class="screenshot-item-v2" target="_blank" rel="noopener noreferrer">
-                            <img loading="lazy" src="{{ img }}" alt="Screenshot {{ loop.index }}" data-fallback="{{ url_for('static', filename='images/fallback.svg') }}">
-                            <div class="overlay"><i class="fas fa-search-plus"></i></div>
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
+                    {% set groups = downloads | groupby('group') %}
+                    {% for group_name, group_items_iter in groups %}
+                      {% set group_items = group_items_iter | list %}
+                      <div class="download-group-v3">
+                          <h4 class="download-group-title-v3">{{ group_name }}</h4>
 
-                {# Download Tab #}
-                {% if downloads %}
-                <div id="download-v2-tab" class="tab-content-v2">
-                    {% if password %}
-                    <div class="mb-5 bg-amber-50 dark:bg-gray-700 border-l-4 border-amber-500 p-4 rounded-r-md shadow-sm">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0"> <i class="fas fa-key text-amber-600 dark:text-amber-400 text-lg"></i> </div>
-                            <div class="ml-3">
-                                <h3 class="text-sm font-semibold text-amber-800 dark:text-amber-200">Download Password</h3>
-                                <div class="mt-1 text-sm text-amber-700 dark:text-amber-300">
-                                    <code class="bg-amber-100 dark:bg-gray-600 px-1.5 py-0.5 rounded select-all font-mono text-xs">{{ password }}</code>
-                                </div>
+                          {# *** CORRECTED Check using iteration and 'in' operator (REMOVING BREAK) *** #}
+                          {% set has_table_links = namespace(value=false) %}
+                          {% for item in group_items %}
+                              {% if item.section is defined and item.section is string and 'Table' in item.section %}
+                                  {% set has_table_links.value = true %}
+                                  {# Removed {% break %} #}
+                              {% endif %}
+                          {% endfor %}
+
+                          {% if has_table_links.value %}
+                            {# Render as Table #}
+                            <div class="overflow-x-auto">
+                              <table class="download-table">
+                                  {# --- More robust dynamic header and part extraction --- #}
+                                  {% set table_links_in_group = group_items | selectattr('section', 'string') | select('contains', 'Table') | list %}
+                                  {% set part_host_map = {} %} {# { 'PartName': {'HostName': link, ...}, ... } #}
+                                  {% set all_hosts = [] %}
+                                  {% for link in table_links_in_group %}
+                                      {% set part_name = link.text.split(' - ')[-1] | trim %}
+                                      {% set host_name = link.section | replace('Links','') | replace('(Alt Row)','') | trim %}
+                                      {% if host_name not in all_hosts %}{% set _ = all_hosts.append(host_name) %}{% endif %}
+                                      {% if part_name not in part_host_map %}{% set _ = part_host_map.update({part_name: {}}) %}{% endif %}
+                                      {% set _ = part_host_map[part_name].update({host_name: link}) %}
+                                  {% endfor %}
+                                  {% set sorted_hosts = all_hosts | sort %}
+                                  {% set sorted_parts = part_host_map.keys() | sort %}
+
+                                  <thead>
+                                      <tr>
+                                          <th>Part</th>
+                                          {% for host in sorted_hosts %}<th>{{ host }}</th>{% endfor %}
+                                      </tr>
+                                  </thead>
+                                  <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                      {% for part_name in sorted_parts %}
+                                          <tr>
+                                              <td class="part-name">{{ part_name }}</td>
+                                              {% for host in sorted_hosts %}
+                                                  <td class="link-cell">
+                                                      {% set link = part_host_map.get(part_name, {}).get(host) %}
+                                                      {% if link %}
+                                                          <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer nofollow" title="{{ link.text }}">
+                                                              <i class="fas fa-download fa-xs mr-1 opacity-60"></i>Download
+                                                          </a>
+                                                          {% if link.password_hint %}<span class="password-hint-v3 block mt-1">(Pass: {{ link.password_hint }})</span>{% endif %}
+                                                      {% else %}
+                                                          <span class="text-gray-400 dark:text-gray-600">-</span> {# Placeholder for missing link #}
+                                                      {% endif %}
+                                                  </td>
+                                              {% endfor %}
+                                          </tr>
+                                      {% endfor %}
+                                  </tbody>
+                              </table>
                             </div>
-                        </div>
-                    </div>
-                    {% endif %}
 
-                    {# Group downloads by the 'group' field from scraper #}
-                    {% set groups = downloads | map(attribute='group') | unique | list %}
-                    {% for group_name in groups %}
-                      <div class="download-group-v2">
-                          <h4 class="download-group-title-v2">{{ group_name }}</h4>
-                          {# Further group by section within the main group #}
-                          {% set sections = downloads | selectattr('group', 'equalto', group_name) | map(attribute='section') | unique | list %}
-                          <div class="divide-y divide-gray-100 dark:divide-gray-750">
-                              {% for section_name in sections %}
-                                <div class="py-3 px-4">
-                                   {% if section_name and section_name not in ["Table Links", "Paragraph Links", "Mirrors/Other", "Table Links (Alt Row)"] %} {# Hide generic section titles #}
-                                      <h5 class="download-section-title-v2">{{ section_name }}</h5>
-                                   {% endif %}
-                                   <div class="space-y-2">
-                                   {% for link in downloads | selectattr('group', 'equalto', group_name) | selectattr('section', 'equalto', section_name) %}
-                                      <div class="download-link-item-v2">
-                                         <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer nofollow">
-                                             <i class="fas fa-download fa-xs mr-1.5 opacity-60"></i>
-                                             {# Clean link text more aggressively for better display #}
-                                             {% set clean_text = link.text | replace('Download', '') | replace('Link', '') | replace(section_name, '') | replace(group_name, '') | replace('()','') | replace('-', '') | title | trim %}
-                                             {{ clean_text if clean_text else link.text }} {# Show original if cleaning removes everything #}
-                                         </a>
-                                         {# Add password hint if available #}
-                                         {% if link.password_hint %}
-                                             <span class="text-amber-600 dark:text-amber-500 text-[10px] font-mono ml-2 whitespace-nowrap">(Pass: {{ link.password_hint }})</span>
-                                         {% endif %}
-                                         {# Use hostname filter #}
-                                         <span class="host-badge">{{ link.url | hostname | title }}</span>
+                          {% else %}
+                            {# Render as List (Mirrors/Paragraphs) #}
+                            {% set paragraph_items = [] %}
+                            {% for item in group_items %}
+                                {% if item.section is not defined or item.section is none or 'Table' not in item.section %}
+                                    {% set _ = paragraph_items.append(item) %}
+                                {% endif %}
+                            {% endfor %}
+
+                            <div class="download-list">
+                                {% for link in paragraph_items %}
+                                   <div class="download-list-item">
+                                      <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer nofollow">
+                                          <i class="fas fa-link fa-xs mr-1.5 opacity-60"></i>
+                                          {% set clean_text = link.text | replace('Download Mirror', '') | replace('Mirror', '') | replace('-', '') | trim %}
+                                          {{ clean_text if clean_text else link.text }}
+                                      </a>
+                                      <div class="link-info">
+                                          {% if link.password_hint %}<span class="password-hint-v3">(Pass: {{ link.password_hint }})</span>{% endif %}
+                                          <span class="host-badge-v3">{{ link.url | hostname | upper }}</span>
                                       </div>
-                                   {% endfor %}
                                    </div>
-                                </div>
-                              {% endfor %}
-                          </div>
+                                {% endfor %}
+                            </div>
+                          {% endif %}
                       </div>
                     {% endfor %}
 
                     {% if not password and downloads | selectattr('password_hint', 'defined') | list | length > 0 %}
                      <p class="text-xs text-amber-700 dark:text-amber-400 mt-4"><i class="fas fa-exclamation-circle mr-1"></i> Note: Some download groups might have specific passwords indicated next to the links.</p>
                     {% endif %}
-                </div>
-                 {% else %} {# If no downloads found in data #}
-                 <div id="download-v2-tab" class="tab-content-v2">
-                      <p class="text-gray-500 italic">No download links available for this game.</p>
-                 </div>
-                {% endif %} {# End if downloads #}
+                 {% else %}
+                     <p class="text-gray-500 italic py-4">No download links available for this game.</p>
+                 {% endif %}
+              </div>
 
-           </div> {# End Tab Content Area #}
-      </div> {# End Tab Card #}
-  </div> {# --- End Right Column --- #}
-
-</div> {# End Main Flex Container #}
-
-{# Related Games (Full Width Below) #}
-{% if related %}
-<div class="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
-  <h2 class="text-xl sm:text-2xl font-bold mb-5 text-center sm:text-left">You Might Also Like</h2>
-  <div class="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-    {% for game in related %}
-    <a href="{{ url_for('web.view_game') }}?url={{ game.url | urlencode }}&site={{ game.site }}"
-       class="group game-card block bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow hover:shadow-xl transition-shadow duration-200">
-      <div class="aspect-video relative overflow-hidden bg-gray-200 dark:bg-gray-700">
-        <img loading="lazy" src="{{ game.image or url_for('static', filename='images/fallback.svg') }}" alt="{{ game.title }}"
-             class="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-             data-fallback="{{ url_for('static', filename='images/fallback.svg') }}">
-        <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+         </div>
       </div>
-      <div class="p-3">
-        <h3 class="text-sm font-semibold line-clamp-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">{{ game.title }}</h3>
-      </div>
-    </a>
-    {% endfor %}
   </div>
 </div>
-{% endif %}
+
+{# Related Games (Full Width Below) #}
+{% if related %} <div class="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700"> <h2 class="text-xl sm:text-2xl font-bold mb-5 text-center sm:text-left">You Might Also Like</h2> <div class="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"> {% for game in related %} <a href="{{ url_for('web.view_game') }}?url={{ game.url | urlencode }}&site={{ game.site }}" class="group game-card block bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow hover:shadow-xl transition-shadow duration-200"> <div class="aspect-video relative overflow-hidden bg-gray-200 dark:bg-gray-700"> <img loading="lazy" src="{{ game.image or url_for('static', filename='images/fallback.svg') }}" alt="{{ game.title }}" class="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" data-fallback="{{ url_for('static', filename='images/fallback.svg') }}"> <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div> </div> <div class="p-3"> <h3 class="text-sm font-semibold line-clamp-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">{{ game.title }}</h3> </div> </a> {% endfor %} </div> </div> {% endif %}
 
 {% endblock %}
 
 {% block extra_scripts %}
-{# Optional: Add lightbox JS init here if you implement one #}
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    // Tab functionality v2
-    const tabButtonsV2 = document.querySelectorAll('.tab-btn-v2');
-    const tabContentsV2 = document.querySelectorAll('.tab-content-v2');
-
-    tabButtonsV2.forEach(button => {
-      button.addEventListener('click', (e) => {
-        e.preventDefault();
-        tabButtonsV2.forEach(btn => btn.classList.remove('active'));
-        tabContentsV2.forEach(content => content.classList.remove('active'));
-
-        button.classList.add('active');
-        const tabId = button.getAttribute('data-tab');
-        const targetContent = document.getElementById(`${tabId}-tab`);
-        if(targetContent) {
-             targetContent.classList.add('active');
-        } else {
-            console.warn(`Tab content not found for ID: ${tabId}-tab`);
-        }
-      });
-    });
-
-    // Image fallback handler
-    document.querySelectorAll('img[data-fallback]').forEach(function(img) {
-        img.addEventListener('error', function() {
-          if (this.src !== this.getAttribute('data-fallback')) {
-            this.src = this.getAttribute('data-fallback');
-          }
-        });
-      });
-
+    // Tab functionality v3
+    const tabButtonsV3 = document.querySelectorAll('.tab-btn-v3');
+    const tabContentsV3 = document.querySelectorAll('.tab-content-v3');
+    function activateTab(button) { if (!button) return; tabButtonsV3.forEach(btn => btn.classList.remove('active')); tabContentsV3.forEach(content => content.classList.remove('active')); button.classList.add('active'); const tabId = button.getAttribute('data-tab'); const targetContent = document.getElementById(`${tabId}-tab`); if(targetContent) { targetContent.classList.add('active'); try { localStorage.setItem('activeGameTab', tabId); } catch (e) {} } else { console.warn(`Tab content not found for ID: ${tabId}-tab`); } }
+    let activeTabFound = false; const storedTabId = localStorage.getItem('activeGameTab'); if (storedTabId) { const storedButton = document.querySelector(`.tab-btn-v3[data-tab="${storedTabId}"]`); if (storedButton) { activateTab(storedButton); activeTabFound = true; } else { localStorage.removeItem('activeGameTab'); } } if (!activeTabFound) { const firstButton = document.querySelector('.tab-btn-v3'); activateTab(firstButton); }
+    tabButtonsV3.forEach(button => { button.addEventListener('click', (e) => { e.preventDefault(); activateTab(button); }); });
+    document.querySelectorAll('img[data-fallback]').forEach(function(img) { img.addEventListener('error', function() { if (this.src !== this.getAttribute('data-fallback')) { this.src = this.getAttribute('data-fallback'); } }); });
   });
 </script>
 {% endblock %}

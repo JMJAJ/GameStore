@@ -102,6 +102,26 @@ GameStore Catalog is a Flask-based web application that scrapes game information
     ```
     The application will typically be available at `http://127.0.0.1:5000/`.
 
+## Configuration
+
+The application can be configured using environment variables, typically set in a `.env` file in the project root.
+
+-   `FLASK_APP`: Set to `app.py`.
+-   `FLASK_DEBUG`: `True` for development (enables reloader, debug mode), `False` for production.
+-   `GAMESTORE_CACHE_DIR`: Path to the directory for storing cached HTML pages (defaults to `./cache`).
+-   `GAMESTORE_CACHE_TIMEOUT`: Cache duration in seconds (defaults to `3600`).
+-   `GAMESTORE_DEFAULT_SITE`: The `site_id` of the scraper to use if none is specified (used mainly by API if `site` param is missing).
+-   `GAMESTORE_USE_PROXIES`: Set to `True` to enable proxy usage for scraping requests (defaults to `False`). Requires the `free-proxy` library to be installed (`pip install free-proxy`).
+-   `GAMESTORE_PROXY_FETCH_COUNT`: How many proxies to attempt to fetch using `free-proxy` on application startup (defaults to `10`). Note that free proxy sources are unreliable, and fewer might be returned.
+-   `GAMESTORE_PROXY_REQUIRE_HTTPS`: Set to `True` to only fetch proxies that claim HTTPS support (defaults to `True`). Recommended for scraping HTTPS sites.
+-   `GAMESTORE_PROXY_MAX_RETRIES`: How many different fetched proxies to try for a single request before failing (defaults to `3`).
+-   `GAMESTORE_API_RATELIMIT_ENABLED`: `True` or `False` to enable API rate limiting.
+-   `GAMESTORE_API_RATELIMIT_*`: Rate limit strings for specific API endpoints (e.g., `100 per hour`).
+
+### Proxy Format (No Longer Used)
+
+The application now uses the `free-proxy` library to dynamically fetch proxies if `GAMESTORE_USE_PROXIES` is set to `True`. The `GAMESTORE_PROXY_FILE` setting is no longer used.
+
 ## Usage
 
 ### Web Interface
@@ -135,11 +155,3 @@ Refer to the API documentation page for detailed request/response formats and ex
     -   `search_games(self, query)`
 4.  The `ScraperFactory` will automatically discover and register your new scraper if it's correctly placed and inherits from `BaseScraper`.
 5.  Test your scraper thoroughly.
-
-## Notes
-
--   The `_root.txt` file contains example selectors for the GamePCISO website, which are used by `gamepciso_scraper.py` and `alternate_site_scraper.py`. It serves as an informational guide for how those selectors were derived.
--   Web scraping can be fragile and may break if the target website's structure changes. Scrapers may need periodic updates.
--   Always respect the terms of service of the websites you are scraping. Be a good internet citizen and avoid overwhelming sites with requests (caching helps with this).
-
-    

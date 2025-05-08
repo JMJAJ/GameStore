@@ -48,12 +48,13 @@
   <nav class="bg-white shadow-md dark:bg-gray-900 sticky top-0 z-50">
     <div class="container mx-auto px-4">
       <div class="flex justify-between items-center h-16">
-        <a href="{{ url_for('web.home') }}" class="flex items-center space-x-2 text-xl font-bold text-primary-600 dark:text-primary-400 hover:opacity-80 transition-opacity">
+        {# This link goes to home, which redirects to view_games_all - OK #}
+        <a href="{{ url_for('web.home') }}" class="flex items-center space-x-2 text-xl font-bold ...">
           <i class="fas fa-dice-d20"></i>
           <span>GameStore Catalog</span>
         </a>
         <div class="flex items-center space-x-2 sm:space-x-4">
-          {# templates/layout.html (Desktop Search Form) #}
+          {# Search form action is web.search - OK #}
           <form action="{{ url_for('web.search') }}" method="get" class="flex items-center">
               {# Hidden input is no longer strictly needed for global search, but keeping doesn't hurt #}
               <input type="hidden" name="site" value="{{ site or default_site_id }}">
@@ -63,29 +64,26 @@
                   <i class="fas fa-search"></i>
               </button>
           </form>
-          
-          {# templates/layout.html (Mobile Search Form) #}
-          <form action="{{ url_for('web.search') }}" method="get" class="flex items-center">
-               {# Hidden input is no longer strictly needed for global search #}
-              <input type="hidden" name="site" value="{{ site or default_site_id }}">
-              <input type="search" name="q" placeholder="Search all sites..." value="{{ query or '' }}"
-                     class="w-full px-4 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white transition-all duration-150">
-              <button type="submit" class="bg-primary-600 hover:bg-primary-700 text-white px-3 py-2 rounded-r-md h-[42px] flex items-center justify-center">
-                  <i class="fas fa-search"></i>
-              </button>
-          </form>
+          {# Dark mode toggle - OK #}
           <button id="darkModeToggle" title="Toggle dark mode" class="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
             <i class="fas fa-moon dark:hidden"></i>
             <i class="fas fa-sun hidden dark:block"></i>
           </button>
-          <a href="{{ url_for('web.api_docs_page') }}" title="API Documentation" class="hidden sm:flex items-center space-x-1 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm">
-            <i class="fas fa-code"></i>
-            <span class="hidden lg:inline">API</span>
-          </a>
-        </div>
+        <a href="{{ url_for('web.api_docs_page') }}" ...>API</a>
       </div>
     </div>
-  </nav>
+    {# Mobile Search form action is web.search - OK #}
+    <form action="{{ url_for('web.search') }}" method="get" class="flex items-center md:hidden py-2">
+      {# Hidden input is no longer strictly needed for global search #}
+     <input type="hidden" name="site" value="{{ site or default_site_id }}">
+     <input type="search" name="q" placeholder="Search all sites..." value="{{ query or '' }}"
+            class="w-full px-4 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white transition-all duration-150">
+     <button type="submit" class="bg-primary-600 hover:bg-primary-700 text-white px-3 py-2 rounded-r-md h-[42px] flex items-center justify-center">
+         <i class="fas fa-search"></i>
+     </button>
+    </form>
+  </div>
+</nav>
 
   <!-- Main Content -->
   <main class="container mx-auto px-4 py-8">
@@ -104,7 +102,7 @@
   </main>
 
   <!-- Footer -->
-  <footer class="bg-gray-200 dark:bg-gray-900 py-6 mt-12 border-t border-gray-300 dark:border-gray-700">
+  <footer class="bg-gray-200 dark:bg-gray-900 py-8 mt-12 border-t border-gray-300 dark:border-gray-700">
     <div class="container mx-auto px-4">
       <div class="flex flex-col md:flex-row justify-between items-center text-sm">
         <div class="text-center md:text-left mb-4 md:mb-0 text-gray-700 dark:text-gray-300">

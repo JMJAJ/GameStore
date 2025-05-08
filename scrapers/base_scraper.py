@@ -2,12 +2,31 @@
 Base scraper class for the GameStore application.
 """
 import requests
-from bs4 import BeautifulSoup, Tag, NavigableString
+from bs4 import BeautifulSoup, Tag
 import logging
 import os
 import time
 from urllib.parse import urlparse, urljoin
 from typing import Optional, Dict, Any, List, Union
+import random # Keep random for potential use later if needed
+from flask import current_app # Import current_app to access config
+
+# --- NEW: Import and initialize colorama ---
+try:
+    import colorama
+    from colorama import Fore, Style, Back
+    colorama.init(autoreset=True) # Automatically reset style after each print
+    COLOR_ENABLED = True
+except ImportError:
+    # Create dummy Fore, Style objects if colorama is not installed
+    class DummyStyle:
+        def __getattr__(self, name): return ""
+    Fore = DummyStyle()
+    Style = DummyStyle()
+    Back = DummyStyle()
+    COLOR_ENABLED = False
+    logging.warning("Colorama not installed, proxy status colors will be disabled.")
+# -----------------------------------------
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -23,20 +42,8 @@ class BaseScraper:
     site_description: Optional[str] = None
     
     def __init__(self, base_url: Optional[str] = None, cache_dir: Optional[str] = None, cache_timeout: int = 3600):
-        """
-        Initialize the scraper.
-        
-        Args:
-            base_url (str, optional): The base URL of the site.
-            cache_dir (str, optional): Directory to cache responses.
-            cache_timeout (int, optional): Cache timeout in seconds. Defaults to 3600 (1 hour).
-        """
-        # Use the class attributes if base_url is not provided in constructor,
-        # or allow overriding via constructor.
         self.base_url: Optional[str] = base_url or getattr(self.__class__, 'base_url', None)
-        self.cache_dir: Optional[str] = cache_dir
-        self.cache_timeout: int = cache_timeout
-        
+        self.cache_dir: Optional[str] = cache_dir; self.cache_timeout: int = cache_timeout
         self.headers: Dict[str, str] = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -45,21 +52,9 @@ class BaseScraper:
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1"
         }
-        
-        # The checks for site_id and site_name are more relevant for the factory
-        # or for direct instantiation. Removing from here as BaseScraper itself
-        # won't have them set. Subclasses are expected to define them as class attributes.
-        # if not self.site_id: # self.site_id here refers to BaseScraper.site_id
-        #     logger.warning(f"{self.__class__.__name__} does not have site_id set.")
-        # if not self.site_name:
-        #     logger.warning(f"{self.__class__.__name__} does not have site_name set.")
-            
         if self.cache_dir and not os.path.exists(self.cache_dir):
-            try:
-                os.makedirs(self.cache_dir, exist_ok=True)
-            except OSError as e:
-                logger.error(f"Failed to create cache directory {self.cache_dir}: {e}")
-                self.cache_dir = None # Disable caching if directory creation fails
+            try: os.makedirs(self.cache_dir, exist_ok=True)
+            except OSError as e: logger.error(f"Failed to create cache dir {self.cache_dir}: {e}"); self.cache_dir = None
     
     def _get_cache_path(self, url: str) -> Optional[str]:
         """Generate a filesystem-safe cache path for the URL"""
@@ -105,56 +100,84 @@ class BaseScraper:
         return True
     
     def _get_soup(self, url: str, force_refresh: bool = False) -> Optional[BeautifulSoup]:
-        """
-        Get BeautifulSoup object for the given URL.
-        
-        Args:
-            url (str): URL to fetch.
-            force_refresh (bool): Force refresh even if cache exists.
-            
-        Returns:
-            Optional[BeautifulSoup]: Parsed HTML, or None on failure.
-        """
         cache_path = self._get_cache_path(url)
-        
+
         if cache_path and not force_refresh and self._is_cache_valid(cache_path):
-            logger.info(f"Loading from cache: {url}")
+            logger.info(f"{Fore.CYAN}CACHE{Style.RESET_ALL}: Loading {url}")
             try:
-                with open(cache_path, 'r', encoding='utf-8') as f:
-                    html_content = f.read()
+                with open(cache_path, 'r', encoding='utf-8') as f: html_content = f.read()
                 return BeautifulSoup(html_content, 'html.parser')
+            except Exception as e: logger.warning(f"Error reading cache file {cache_path}: {e}. Attempting refresh.")
+
+        # --- Proxy Logic ---
+        use_proxies = current_app.config.get('USE_PROXIES', False)
+        proxy_cycle = current_app.config.get('PROXY_CYCLE') if use_proxies else None
+        # --- Check if the cycle still has proxies (in case fetching failed) ---
+        if use_proxies and not current_app.config.get('PROXY_LIST'):
+            logger.warning("Proxy usage enabled but proxy list is empty. Disabling for this request.")
+            use_proxies = False
+            proxy_cycle = None
+        # ----------------------------------------------------------------------
+        max_retries = current_app.config.get('PROXY_MAX_RETRIES', 3) if use_proxies else 1
+        target_domain = urlparse(url).netloc or "unknown_target"
+
+        for attempt in range(max_retries):
+            current_proxy_url = None
+            proxies_dict = None
+            log_prefix = f"Attempt {attempt + 1}/{max_retries}"
+
+            if proxy_cycle: # If we intend to use proxies and have a cycle
+                try:
+                    proxy_info = next(proxy_cycle)
+                    current_proxy_url = proxy_info['url']
+                    target_scheme = urlparse(url).scheme
+                    proxies_dict = {target_scheme: current_proxy_url}
+                    proxy_ip = urlparse(current_proxy_url).netloc
+                    logger.info(f"{log_prefix}: {Style.DIM}Local -> {Fore.YELLOW}{proxy_ip}{Style.RESET_ALL}{Style.DIM} -> {target_domain} ...{Style.RESET_ALL} ({url[:50]}...)")
+                except StopIteration: logger.warning("Proxy cycle iterator stopped unexpectedly."); proxies_dict = None
+                except Exception as e: logger.error(f"Error getting next proxy: {e}."); proxies_dict = None
+            else:
+                 if attempt == 0: logger.info(f"{Style.DIM}Local -> DIRECT -> {target_domain}{Style.RESET_ALL} ({url[:50]}...)")
+
+            try:
+                response = requests.get(url, headers=self.headers, timeout=20, proxies=proxies_dict)
+                proxy_marker = urlparse(current_proxy_url).netloc if current_proxy_url else 'DIRECT'
+                color_marker = Fore.YELLOW if current_proxy_url else ''
+
+                if response.status_code >= 400:
+                    logger.warning(f"{log_prefix}: {Fore.RED}FAIL{Style.RESET_ALL} (HTTP {response.status_code}) "
+                                   f"{Style.DIM}Local -> {color_marker}{proxy_marker}{Style.RESET_ALL}{Style.DIM} -> {target_domain}{Style.RESET_ALL} ({url[:50]}...)")
+                    response.raise_for_status()
+
+                logger.info(f"{log_prefix}: {Fore.GREEN}OK{Style.RESET_ALL} (HTTP {response.status_code}) "
+                            f"{Style.DIM}Local -> {color_marker}{proxy_marker}{Style.RESET_ALL}{Style.DIM} -> {target_domain}{Style.RESET_ALL} ({url[:50]}...)")
+
+                html_content = response.text
+                if cache_path:
+                    try:
+                        with open(cache_path, 'w', encoding='utf-8') as f: f.write(html_content); logger.debug(f"Saved to cache: {cache_path}")
+                    except Exception as e: logger.warning(f"Error writing to cache file {cache_path}: {e}")
+                return BeautifulSoup(html_content, 'html.parser')
+
+            except requests.exceptions.RequestException as e:
+                proxy_marker = urlparse(current_proxy_url).netloc if current_proxy_url else 'DIRECT'
+                color_marker = Fore.YELLOW if current_proxy_url else ''
+                logger.warning(f"{log_prefix}: {Fore.RED}FAIL{Style.RESET_ALL} (Network Error) "
+                               f"{Style.DIM}Local -> {color_marker}{proxy_marker}{Style.RESET_ALL}{Style.DIM} -> {target_domain}{Style.RESET_ALL} ({url[:50]}...) - Error: {e}")
+                if attempt == max_retries - 1:
+                    logger.error(f"All {max_retries} attempts failed for {url}.")
+                    if cache_path and os.path.exists(cache_path):
+                        logger.info(f"{Fore.CYAN}CACHE{Style.RESET_ALL}: Using stale cache as final fallback for {url}")
+                        try:
+                            with open(cache_path, 'r', encoding='utf-8') as f: html_content = f.read(); return BeautifulSoup(html_content, 'html.parser')
+                        except Exception as read_e: logger.warning(f"Error reading stale cache file {cache_path}: {read_e}")
+                    return None
+                time.sleep(0.5) # Delay before next proxy attempt
             except Exception as e:
-                logger.warning(f"Error reading cache file {cache_path}: {e}. Attempting refresh.")
-        
-        try:
-            logger.info(f"Fetching from web: {url}")
-            response = requests.get(url, headers=self.headers, timeout=15) 
-            response.raise_for_status()
-            html_content = response.text
-            
-            if cache_path:
-                try:
-                    with open(cache_path, 'w', encoding='utf-8') as f:
-                        f.write(html_content)
-                    logger.debug(f"Saved to cache: {cache_path}")
-                except Exception as e:
-                    logger.warning(f"Error writing to cache file {cache_path}: {e}")
-            
-            return BeautifulSoup(html_content, 'html.parser')
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching {url}: {e}")
-            if cache_path and os.path.exists(cache_path):
-                logger.info(f"Using stale cache as fallback for {url}")
-                try:
-                    with open(cache_path, 'r', encoding='utf-8') as f:
-                        html_content = f.read()
-                    return BeautifulSoup(html_content, 'html.parser')
-                except Exception as read_e:
-                    logger.warning(f"Error reading stale cache file {cache_path}: {read_e}")
-            return None 
-        except Exception as e: 
-            logger.error(f"An unexpected error occurred while processing {url}: {e}")
-            return None
+                 logger.error(f"Unexpected error processing {url} (Attempt {attempt+1}): {e}")
+                 return None
+
+        return None
 
     def _extract_text(self, soup_or_element: Union[BeautifulSoup, Tag], selector: str, default: str = "") -> str:
         """Extract text from an element"""
