@@ -48,55 +48,63 @@ def get_hostname(url_string):
     except Exception:
         return ''
     
-def get_fresh_proxies(count=20, require_https=True, timeout=0.5, rand=True) -> List[Dict[str, Any]]:
-    """Fetches a list of fresh proxies using free-proxy."""
-    if not FP_AVAILABLE:
-        logger.warning("free-proxy library not installed. Cannot fetch proxies.")
-        return []
-
+def load_proxies(proxy_file_path: str) -> List[Dict[str, Any]]:
+    """Loads and filters proxies from the new JSON file structure."""
     proxies = []
-    logger.info(f"Attempting to fetch {count} fresh proxies (HTTPS required: {require_https})...")
     try:
-        # Note: free-proxy can sometimes be slow or fail depending on source sites
-        proxy_fetcher = FreeProxy(https=require_https, timeout=timeout, rand=rand)
-        # Fetching multiple proxies reliably can be hit or miss with free lists.
-        # Let's try fetching one by one up to the count, handling errors.
-        fetched_count = 0
-        attempts = 0
-        max_attempts = count * 3 # Give it more attempts than requested count
+        with open(proxy_file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
 
-        while fetched_count < count and attempts < max_attempts:
-            attempts += 1
-            try:
-                proxy_str = proxy_fetcher.get()
-                if proxy_str:
-                     # Basic validation and formatting
-                     parsed = urlparse(proxy_str)
-                     if parsed.scheme and parsed.netloc:
-                          proxies.append({
-                              'url': proxy_str,
-                              'protocol': parsed.scheme,
-                              'https_support': parsed.scheme == 'https'
-                          })
-                          fetched_count +=1
-                          # Avoid duplicates (though unlikely with random fetch)
-                          proxies = [dict(t) for t in {tuple(d.items()) for d in proxies}]
-                          fetched_count = len(proxies)
+        # Extract the list from the 'proxies' key
+        raw_proxies = data.get("proxies", [])
+        logger.info(f"Loaded {len(raw_proxies)} raw proxies from {proxy_file_path} (under 'proxies' key)")
 
-            except Exception as fetch_err:
-                 logger.debug(f"free-proxy get() attempt failed: {fetch_err}")
-                 time.sleep(0.1) # Small delay before next attempt
-            if attempts % 10 == 0:
-                 logger.debug(f"Proxy fetch attempts: {attempts}/{max_attempts}, Found: {fetched_count}")
+        usable_protocols = {'http', 'https', 'socks4', 'socks5'} # Allow SOCKS proxies too
 
+        for p in raw_proxies:
+            # Check if the proxy is marked as alive (optional but good)
+            if not p.get('alive', False):
+                continue
 
-        if not proxies:
-             logger.warning("Failed to fetch any proxies using free-proxy.")
-        else:
-             logger.info(f"Successfully fetched {len(proxies)} unique proxies.")
+            protocol = p.get('protocol', '').lower()
+            ip = p.get('ip')
+            port = p.get('port')
 
+            if protocol in usable_protocols and ip and port:
+                # Construct the proxy URL string for requests
+                # Requests uses http:// for http, https:// for https,
+                # socks4:// for SOCKS4, socks5:// for SOCKS5
+                if protocol.startswith('socks'):
+                    proxy_url = f"{protocol}://{ip}:{port}"
+                elif protocol in ['http', 'https']:
+                    # For http/https proxies, requests usually expects http:// in the proxy dict key
+                    # but the protocol itself tells us if it *can* handle https target sites via connect tunnel
+                     proxy_url = f"http://{ip}:{port}" # Use http:// scheme for the proxy definition itself
+                else:
+                    continue # Skip unknown protocols
+
+                proxies.append({
+                    'url': proxy_url, # URL formatted for requests proxy dict value
+                    'protocol': protocol, # Original protocol (http, https, socks4, socks5)
+                    'supports_https_target': p.get('ssl', False) or protocol == 'https', # Can it proxy HTTPS targets?
+                    # You could add anonymity, uptime etc. here if needed for filtering/prioritization
+                    'anonymity': p.get('anonymity'),
+                    'uptime': p.get('uptime'),
+                })
+
+        # Optional: Filter further based on anonymity or uptime
+        # initial_count = len(proxies)
+        # proxies = [p for p in proxies if p['anonymity'] == 'elite' and p['uptime'] > 50]
+        # logger.info(f"Filtered by elite/uptime > 50%: {initial_count} -> {len(proxies)}")
+
+        logger.info(f"Filtered down to {len(proxies)} usable and alive proxies.")
+
+    except FileNotFoundError:
+        logger.warning(f"Proxy file not found: {proxy_file_path}. Proxies disabled.")
+    except json.JSONDecodeError:
+        logger.error(f"Error decoding JSON from proxy file: {proxy_file_path}. Proxies disabled.")
     except Exception as e:
-        logger.error(f"Error initializing or using FreeProxy: {e}")
+        logger.error(f"An unexpected error occurred loading proxies: {e}. Proxies disabled.")
 
     return proxies
 
@@ -118,10 +126,9 @@ def create_app(config: Optional[Dict[str, Any]] = None) -> Flask:
         RATELIMIT_API_GAME_DETAILS=os.environ.get('GAMESTORE_API_RATELIMIT_GAME_DETAILS', '60 per hour'),
         RATELIMIT_API_SEARCH=os.environ.get('GAMESTORE_API_RATELIMIT_SEARCH', '120 per hour'),
         RATELIMIT_API_SITES=os.environ.get('GAMESTORE_API_RATELIMIT_SITES', '200 per hour'),
+        PROXY_FILE=os.environ.get('GAMESTORE_PROXY_FILE', 'proxy.json'),
         USE_PROXIES=os.environ.get('GAMESTORE_USE_PROXIES', 'False').lower() == 'true',
-        PROXY_MAX_RETRIES=int(os.environ.get('GAMESTORE_PROXY_MAX_RETRIES', '3')),
-        PROXY_FETCH_COUNT=int(os.environ.get('GAMESTORE_PROXY_FETCH_COUNT', '10')), # How many to fetch initially
-        PROXY_REQUIRE_HTTPS=os.environ.get('GAMESTORE_PROXY_REQUIRE_HTTPS', 'True').lower() == 'true', # Prefer HTTPS 
+        PROXY_MAX_RETRIES=int(os.environ.get('GAMESTORE_PROXY_MAX_RETRIES', '3'))
     )
     
     # Override with environment variables
@@ -133,22 +140,15 @@ def create_app(config: Optional[Dict[str, Any]] = None) -> Flask:
     # --- Load Proxies using free-proxy ---
     app.config['PROXY_LIST'] = []
     app.config['PROXY_CYCLE'] = None
-    if app.config['USE_PROXIES'] and FP_AVAILABLE:
-        # Fetch proxies on startup
-        proxy_list = get_fresh_proxies(
-            count=app.config['PROXY_FETCH_COUNT'],
-            require_https=app.config['PROXY_REQUIRE_HTTPS']
-            )
+    if app.config['USE_PROXIES']:
+        proxy_list = load_proxies(app.config['PROXY_FILE'])
         if proxy_list:
             app.config['PROXY_LIST'] = proxy_list
             app.config['PROXY_CYCLE'] = itertools.cycle(proxy_list)
-            logger.info(f"Proxy support enabled. Using {len(proxy_list)} proxies fetched via free-proxy.")
+            logger.info(f"Proxy support enabled. Using {len(proxy_list)} proxies.")
         else:
             app.config['USE_PROXIES'] = False
-            logger.warning("Proxy usage disabled due to fetch errors or empty list from free-proxy.")
-    elif app.config['USE_PROXIES'] and not FP_AVAILABLE:
-        logger.warning("GAMESTORE_USE_PROXIES is True, but free-proxy library is not installed. Proxies disabled.")
-        app.config['USE_PROXIES'] = False
+            logger.warning("Proxy usage disabled due to loading errors or empty list.")
     else:
          logger.info("Proxy usage is disabled by configuration.")
 

@@ -111,10 +111,14 @@ The application can be configured using environment variables, typically set in 
 -   `GAMESTORE_CACHE_DIR`: Path to the directory for storing cached HTML pages (defaults to `./cache`).
 -   `GAMESTORE_CACHE_TIMEOUT`: Cache duration in seconds (defaults to `3600`).
 -   `GAMESTORE_DEFAULT_SITE`: The `site_id` of the scraper to use if none is specified (used mainly by API if `site` param is missing).
--   `GAMESTORE_USE_PROXIES`: Set to `True` to enable proxy usage for scraping requests (defaults to `False`). Requires the `free-proxy` library to be installed (`pip install free-proxy`).
--   `GAMESTORE_PROXY_FETCH_COUNT`: How many proxies to attempt to fetch using `free-proxy` on application startup (defaults to `10`). Note that free proxy sources are unreliable, and fewer might be returned.
--   `GAMESTORE_PROXY_REQUIRE_HTTPS`: Set to `True` to only fetch proxies that claim HTTPS support (defaults to `True`). Recommended for scraping HTTPS sites.
--   `GAMESTORE_PROXY_MAX_RETRIES`: How many different fetched proxies to try for a single request before failing (defaults to `3`).
+-   `GAMESTORE_USE_PROXIES`: Set to `True` to enable proxy usage (defaults to `False`). Requires `free-proxy` library.
+-   `GAMESTORE_PROXY_TIMEOUT`: Timeout in seconds when `free-proxy` checks if a proxy works (defaults to `0.5`).
+-   `GAMESTORE_PROXY_REQUIRE_HTTPS`: `True` to only fetch HTTPS proxies (defaults to `True`). Recommended.
+-   `GAMESTORE_PROXY_ANONYM`: `True` to require anonymous proxies (defaults to `False`).
+-   `GAMESTORE_PROXY_ELITE`: `True` to require elite proxies (defaults to `False`).
+-   `GAMESTORE_PROXY_GOOGLE`: `True` or `False` to filter proxies based on Google compatibility test, leave empty for no filtering.
+-   `GAMESTORE_PROXY_COUNTRY_ID`: Optional comma-separated list of 2-letter country codes (e.g., `US,GB,DE`) to restrict proxies to specific countries. Leave empty for worldwide.
+-   `GAMESTORE_PROXY_MAX_RETRIES`: How many times to retry a request with a *newly fetched* proxy if the previous attempt failed (defaults to `3`).
 -   `GAMESTORE_API_RATELIMIT_ENABLED`: `True` or `False` to enable API rate limiting.
 -   `GAMESTORE_API_RATELIMIT_*`: Rate limit strings for specific API endpoints (e.g., `100 per hour`).
 

@@ -107,26 +107,26 @@ class BaseScraper:
             try:
                 with open(cache_path, 'r', encoding='utf-8') as f: html_content = f.read()
                 return BeautifulSoup(html_content, 'html.parser')
-            except Exception as e: logger.warning(f"Error reading cache file {cache_path}: {e}. Attempting refresh.")
+            except Exception as e:
+                logger.warning(f"Error reading cache file {cache_path}: {e}. Attempting refresh.")
 
-        # --- Proxy Logic ---
         use_proxies = current_app.config.get('USE_PROXIES', False)
         proxy_cycle = current_app.config.get('PROXY_CYCLE') if use_proxies else None
-        # --- Check if the cycle still has proxies (in case fetching failed) ---
-        if use_proxies and not current_app.config.get('PROXY_LIST'):
-            logger.warning("Proxy usage enabled but proxy list is empty. Disabling for this request.")
-            use_proxies = False
-            proxy_cycle = None
-        # ----------------------------------------------------------------------
-        max_retries = current_app.config.get('PROXY_MAX_RETRIES', 3) if use_proxies else 1
-        target_domain = urlparse(url).netloc or "unknown_target"
+        # Determine number of attempts: proxy retries + 1 final direct attempt if proxies fail
+        proxy_retries = current_app.config.get('PROXY_MAX_RETRIES', 3) if use_proxies else 0
+        total_attempts = proxy_retries + 1 # Includes the final direct attempt
 
-        for attempt in range(max_retries):
+        target_domain = urlparse(url).netloc or "unknown_target"
+        final_direct_attempt_made = False
+
+        for attempt in range(total_attempts):
             current_proxy_url = None
             proxies_dict = None
-            log_prefix = f"Attempt {attempt + 1}/{max_retries}"
+            is_proxy_attempt = use_proxies and attempt < proxy_retries
 
-            if proxy_cycle: # If we intend to use proxies and have a cycle
+            log_prefix = f"Attempt {attempt + 1}/{total_attempts}"
+
+            if is_proxy_attempt and proxy_cycle:
                 try:
                     proxy_info = next(proxy_cycle)
                     current_proxy_url = proxy_info['url']
@@ -134,48 +134,70 @@ class BaseScraper:
                     proxies_dict = {target_scheme: current_proxy_url}
                     proxy_ip = urlparse(current_proxy_url).netloc
                     logger.info(f"{log_prefix}: {Style.DIM}Local -> {Fore.YELLOW}{proxy_ip}{Style.RESET_ALL}{Style.DIM} -> {target_domain} ...{Style.RESET_ALL} ({url[:50]}...)")
-                except StopIteration: logger.warning("Proxy cycle iterator stopped unexpectedly."); proxies_dict = None
-                except Exception as e: logger.error(f"Error getting next proxy: {e}."); proxies_dict = None
-            else:
-                 if attempt == 0: logger.info(f"{Style.DIM}Local -> DIRECT -> {target_domain}{Style.RESET_ALL} ({url[:50]}...)")
+                except Exception as e:
+                    logger.error(f"Error getting next proxy: {e}. Skipping proxy for this attempt.")
+                    is_proxy_attempt = False # Fallback to direct if proxy selection fails
+                    # Continue to the direct attempt logic below
+
+            # If not a proxy attempt (either disabled, retries exhausted, or error getting proxy)
+            if not is_proxy_attempt:
+                # Only log direct attempt info once, or if it's the *final* fallback
+                if attempt == 0 or (attempt == proxy_retries and use_proxies): # Log if it's the very first try OR the final fallback after proxies
+                    log_prefix = f"{log_prefix} (DIRECT)" # Clarify it's a direct attempt
+                    logger.info(f"{log_prefix}: {Style.DIM}Local -> DIRECT -> {target_domain}{Style.RESET_ALL} ({url[:50]}...)")
+                    final_direct_attempt_made = True # Mark that we made the direct attempt
+                elif use_proxies:
+                    # This case (attempt > 0 but < proxy_retries and not is_proxy_attempt)
+                    # happens if getting a proxy failed mid-cycle. We skip this attempt
+                    # to avoid redundant direct tries before the final one.
+                    continue
 
             try:
-                response = requests.get(url, headers=self.headers, timeout=20, proxies=proxies_dict)
-                proxy_marker = urlparse(current_proxy_url).netloc if current_proxy_url else 'DIRECT'
-                color_marker = Fore.YELLOW if current_proxy_url else ''
+                response = requests.get(
+                    url, headers=self.headers, timeout=20, proxies=proxies_dict # proxies=None if direct
+                )
+
+                log_proxy_info = f"{Fore.YELLOW}{urlparse(current_proxy_url).netloc}{Style.RESET_ALL}" if current_proxy_url else "DIRECT"
 
                 if response.status_code >= 400:
                     logger.warning(f"{log_prefix}: {Fore.RED}FAIL{Style.RESET_ALL} (HTTP {response.status_code}) "
-                                   f"{Style.DIM}Local -> {color_marker}{proxy_marker}{Style.RESET_ALL}{Style.DIM} -> {target_domain}{Style.RESET_ALL} ({url[:50]}...)")
-                    response.raise_for_status()
+                                   f"{Style.DIM}Local -> {log_proxy_info}{Style.DIM} -> {target_domain}{Style.RESET_ALL} ({url[:50]}...)")
+                    response.raise_for_status() # Trigger retry/failure
 
+                # Success
                 logger.info(f"{log_prefix}: {Fore.GREEN}OK{Style.RESET_ALL} (HTTP {response.status_code}) "
-                            f"{Style.DIM}Local -> {color_marker}{proxy_marker}{Style.RESET_ALL}{Style.DIM} -> {target_domain}{Style.RESET_ALL} ({url[:50]}...)")
+                            f"{Style.DIM}Local -> {log_proxy_info}{Style.DIM} -> {target_domain}{Style.RESET_ALL} ({url[:50]}...)")
 
                 html_content = response.text
                 if cache_path:
                     try:
-                        with open(cache_path, 'w', encoding='utf-8') as f: f.write(html_content); logger.debug(f"Saved to cache: {cache_path}")
+                        with open(cache_path, 'w', encoding='utf-8') as f: f.write(html_content)
+                        logger.debug(f"Saved to cache: {cache_path}")
                     except Exception as e: logger.warning(f"Error writing to cache file {cache_path}: {e}")
                 return BeautifulSoup(html_content, 'html.parser')
 
             except requests.exceptions.RequestException as e:
-                proxy_marker = urlparse(current_proxy_url).netloc if current_proxy_url else 'DIRECT'
-                color_marker = Fore.YELLOW if current_proxy_url else ''
+                log_proxy_info = f"{Fore.YELLOW}{urlparse(current_proxy_url).netloc}{Style.RESET_ALL}" if current_proxy_url else "DIRECT"
                 logger.warning(f"{log_prefix}: {Fore.RED}FAIL{Style.RESET_ALL} (Network Error) "
-                               f"{Style.DIM}Local -> {color_marker}{proxy_marker}{Style.RESET_ALL}{Style.DIM} -> {target_domain}{Style.RESET_ALL} ({url[:50]}...) - Error: {e}")
-                if attempt == max_retries - 1:
-                    logger.error(f"All {max_retries} attempts failed for {url}.")
+                               f"{Style.DIM}Local -> {log_proxy_info}{Style.DIM} -> {target_domain}{Style.RESET_ALL} ({url[:50]}...) - Error: {e}")
+
+                # Check if this was the last possible attempt (either final proxy retry OR the final direct attempt)
+                if attempt == total_attempts - 1:
+                    logger.error(f"All {total_attempts} attempts failed for {url}.")
+                    # Try stale cache as last resort
                     if cache_path and os.path.exists(cache_path):
                         logger.info(f"{Fore.CYAN}CACHE{Style.RESET_ALL}: Using stale cache as final fallback for {url}")
                         try:
-                            with open(cache_path, 'r', encoding='utf-8') as f: html_content = f.read(); return BeautifulSoup(html_content, 'html.parser')
+                            with open(cache_path, 'r', encoding='utf-8') as f: html_content = f.read()
+                            return BeautifulSoup(html_content, 'html.parser')
                         except Exception as read_e: logger.warning(f"Error reading stale cache file {cache_path}: {read_e}")
-                    return None
-                time.sleep(0.5) # Delay before next proxy attempt
+                    return None # Failed entirely
+                # Delay only if we are going to retry (with proxy or direct)
+                time.sleep(0.5 if is_proxy_attempt else 0.1) # Shorter delay if falling back to direct
+
             except Exception as e:
                  logger.error(f"Unexpected error processing {url} (Attempt {attempt+1}): {e}")
-                 return None
+                 return None # Unexpected error, stop trying
 
         return None
 
